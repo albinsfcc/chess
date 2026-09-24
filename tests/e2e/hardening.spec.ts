@@ -10,7 +10,9 @@ async function paste(page: Page, pgn = annotatedPgn, count = 1) {
   await page.getByRole("button", { name: "Paste PGN", exact: true }).click();
   await page.getByLabel("PGN games", { exact: true }).fill(pgn);
   await page.getByRole("button", { name: "Validate", exact: true }).click();
-  await page.getByRole("button", { name: `Import ${count} game${count === 1 ? "" : "s"}`, exact: true }).click(); await close(page);
+  await page.getByRole("button", { name: `Import ${count} game${count === 1 ? "" : "s"}`, exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("button", { name: "Validate", exact: true })).toBeEnabled();
+  await close(page);
 }
 async function settings(page: Page) { await page.getByRole("button", { name: "Settings", exact: true }).click(); }
 

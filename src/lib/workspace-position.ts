@@ -1,6 +1,7 @@
+import { treeNode } from "./pgn/position";
 import { Chess, DEFAULT_POSITION, type Color, type PieceSymbol, type Square } from "chess.js";
 import type { GameState } from "./game";
-import type { GameDocument, GameNode, GameTree, NodePath } from "./pgn/domain";
+import type { GameDocument, GameNode, NodePath } from "./pgn/domain";
 
 export const sideName = { w: "White", b: "Black" } as const;
 export const captureOrder = ["q", "r", "b", "n", "p"] as const;
@@ -26,11 +27,6 @@ export function initialClock(timeControl: string, initialFen: string): Clock | n
   if (!match || !Number.isSafeInteger(Number(match[1]))) return null;
   return { seconds: Number(match[1]), fraction: match[2] ?? "" };
 }
-function nodeAt(tree: GameTree, path: NodePath): GameNode | undefined {
-  let line = tree.mainLine, node: GameNode | undefined;
-  for (let i = 0; i < path.length; i += 2) { node = line[path[i]]; if (!node) return; if (i + 1 < path.length) line = node.variations[path[i + 1]] ?? []; }
-  return node;
-}
 function clockOn(node: GameNode): Clock | null {
   const annotation = node.annotations.clk;
   const values = typeof annotation === "string" ? [annotation] : annotation ?? [];
@@ -41,12 +37,12 @@ function clockOn(node: GameNode): Clock | null {
 export function clocksAt(document: GameDocument | null, paths: NodePath[], ply: number): Record<Color, Clock | null> {
   const initial = document ? initialClock(document.game.timeControl, document.tree.initialFen) : null;
   const clocks: Record<Color, Clock | null> = { w: initial, b: initial };
-  if (document) for (const path of paths.slice(0, ply)) { const node = nodeAt(document.tree, path); if (node) { const clock = clockOn(node); if (clock) clocks[node.turn] = clock; } }
+  if (document) for (const path of paths.slice(0, ply)) { const node = treeNode(document.tree, path); if (node) { const clock = clockOn(node); if (clock) clocks[node.turn] = clock; } }
   return clocks;
 }
 export function panelOrder(orientation: "white" | "black"): readonly [Color, Color] { return orientation === "white" ? ["b", "w"] : ["w", "b"]; }
-export function legalDestinations(chess: Chess, square: string | null, enabled = true) {
-  if (!enabled || !square || !/^[a-h][1-8]$/.test(square) || chess.get(square as Square)?.color !== chess.turn() || chess.isGameOver()) return [];
+export function legalDestinations(chess: Chess, square: string | null, enabled = true, allowDrawContinuation = false) {
+  if (!enabled || !square || !/^[a-h][1-8]$/.test(square) || chess.get(square as Square)?.color !== chess.turn() || (!allowDrawContinuation && chess.isGameOver())) return [];
   return [...new Map(chess.moves({ square: square as Square, verbose: true }).map((move) => [move.to, { square: move.to, capture: !!move.captured }])).values()];
 }
 export function materialBalance(chess: Chess): number {

@@ -25,6 +25,7 @@ export const nodeSchema: z.ZodType<GameNode> = z.lazy(() => z.object({
 export const treeSchema = z.object({
   initialFen: z.string().min(1), result: resultSchema, playable: z.boolean(),
   comments: z.array(z.string()), annotations: annotationsSchema, mainLine: z.array(nodeSchema),
+  userBranches: z.array(z.object({ root: z.array(z.number().int().nonnegative()).max(101), moves: z.array(nodeSchema).max(10000) })).max(500).optional(),
 });
 export type GameTree = z.infer<typeof treeSchema>;
 

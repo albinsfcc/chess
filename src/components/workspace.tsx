@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { gameStatus } from "@/lib/game";
 import { panelOrder, workspacePosition } from "@/lib/workspace-position";
+import { useBoardFit } from "./use-board-fit";
+import { navigationPly } from "@/lib/navigation";
 import { PlayerPanel } from "./player-panel";
 import { useWorkspace } from "@/store/workspace";
 import { PgnImportDialog } from "@/components/pgn-import-dialog";
@@ -24,6 +26,7 @@ const GameBoard = dynamic(() => import("@/components/game-board").then((module) 
 });
 
 export function Workspace() {
+  const boardHost = useBoardFit();
   const game = useWorkspace((state) => state.game);
   const imported = useWorkspace((state) => state.imported);
   const closeGame = useWorkspace((state) => state.closeGame);
@@ -40,6 +43,18 @@ export function Workspace() {
   useEffect(() => { hydratePreferences(); }, [hydratePreferences]);
   useEffect(() => connectAnalysis(), []);
   useEffect(() => {
+    const navigate = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [role="combobox"], [role="slider"]'))) return;
+      const game = useWorkspace.getState().game;
+      const next = navigationPly(event.key, game.cursor, game.moves.length);
+      if (next !== undefined) { event.preventDefault(); goTo(next); }
+    };
+    window.addEventListener("keydown", navigate);
+    return () => window.removeEventListener("keydown", navigate);
+  }, [goTo]);
+  useEffect(() => {
     const hidden = () => {
       if (document.visibilityState !== "hidden") return;
       if (useAnalysis.getState().enabled) { useAnalysis.getState().stop(); useAnalysis.setState({ error: "Analysis paused while this tab was hidden. Resume when you are ready." }); }
@@ -50,41 +65,32 @@ export function Workspace() {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="workspace-shell min-h-screen">
       <header className="border-b bg-card/50">
-        <div className="mx-auto flex max-w-[1360px] flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-[1920px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary"><Crown size={23} /></div>
-            <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><p className="text-xs tracking-wide text-muted-foreground">YOUR LOCAL WORKSPACE</p></div>
+            <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><h1 className="text-xs tracking-wide text-muted-foreground">Workspace</h1></div>
           </div>
-          <div className="flex items-center gap-5">
-            <span className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex"><span className="size-1.5 rounded-full bg-primary" /> Local & private</span>
+          <div className="flex flex-wrap items-center gap-2" aria-label="Import actions">
+            <PlatformImportDialog platform="chesscom" /><PlatformImportDialog platform="lichess" /><PgnImportDialog />
             <SettingsDialog />
           </div>
         </div>
       </header>
 
-      <main id="workspace-main" className="mx-auto max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8">
-        <div className="mb-7 flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight">Workspace</h1><span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">{imported ? "Game viewer" : "Free play"}</span></div>
-          <div className="flex flex-wrap gap-2" aria-label="Import actions">
-            <PlatformImportDialog platform="chesscom" />
-            <PlatformImportDialog platform="lichess" />
-            <PgnImportDialog />
-          </div>
-        </div>
-
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)] xl:gap-9">
-          <section aria-label="Chess board" className="min-w-0 lg:sticky lg:top-6">
-            <div className="mx-auto max-w-[660px]">
-              <div className="mb-3" data-testid="top-player"><PlayerPanel player={players[top]} /></div>
+      <main id="workspace-main" className="workspace-main mx-auto w-full max-w-[1920px] px-3 py-3 sm:px-5">
+        <div className="workspace-grid grid items-start gap-4">
+          <section ref={boardHost} aria-label="Chess board" className="workspace-board-area min-w-0">
+            <div className="workspace-chess mx-auto w-full">
+              <div data-board-chrome className="mb-2" data-testid="top-player"><PlayerPanel player={players[top]} /></div>
               <GameBoard />
-              <div className="mt-3" data-testid="bottom-player"><PlayerPanel player={players[bottom]} /></div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+              <div data-board-chrome className="mt-2" data-testid="bottom-player"><PlayerPanel player={players[bottom]} /></div>
+              <div data-board-chrome className="mt-1 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">Standard chess</span>
                 <p role="status" data-testid="game-status" className={`text-sm font-medium ${chess.isCheck() ? "text-rose-300" : "text-primary"}`}>{status}</p>
               </div>
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
+              <div data-board-chrome data-testid="board-navigation" className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-2">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" aria-label={imported ? "First position" : "Go to start"} disabled={game.cursor === 0} onClick={() => goTo(0)}><ChevronFirst /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Previous move" : "Undo move"} disabled={game.cursor === 0} onClick={() => goTo(game.cursor - 1)}><ArrowLeft /></Button>
@@ -99,7 +105,7 @@ export function Workspace() {
             </div>
           </section>
 
-          <aside className="grid min-w-0 grid-cols-1 gap-5" aria-label="Game workspace panels">
+          <aside className="workspace-panels grid min-w-0 grid-cols-1 gap-4" aria-label="Game workspace panels" tabIndex={0}>
             {imported ? <ImportedGameViewer /> : <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
               <div className="flex items-center justify-between border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves</h2><span className="font-mono text-xs text-muted-foreground">{game.cursor} / {game.moves.length} ply</span></div>
               {!game.moves.length ? (
@@ -127,10 +133,10 @@ export function Workspace() {
             <AnalysisPanel />
 
             <GameLibrary />
+            {storageError && <p role="alert" className="text-sm text-destructive">{storageError}</p>}
+            <footer className="flex items-center gap-2 border-t py-3 text-xs text-muted-foreground"><LockKeyhole size={13} /> Local and private. Games and preferences stay on this device.</footer>
           </aside>
         </div>
-        {storageError && <p role="alert" className="mt-5 text-sm text-destructive">{storageError}</p>}
-        <footer className="mt-8 flex items-center gap-2 border-t pt-5 text-xs text-muted-foreground"><LockKeyhole size={13} /> No account needed. Board preferences are saved on this device.</footer>
       </main>
     </div>
   );

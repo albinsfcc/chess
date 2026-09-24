@@ -27,21 +27,17 @@ function platformStore(platform: Platform) {
       return controller.signal;
     }
     function warn(message: string) { set((state) => ({ warnings: [...state.warnings.slice(-99), message] })); }
-    async function loadMonths(profile: PlatformProfile, signal: AbortSignal) {
-      const months = await adapter.months(profile.canonicalUsername, signal);
-      signal.throwIfAborted(); set({ months });
-    }
     return {
       profile: null, candidate: null, editing: true, loading: false, busy: null, months: [], rows: [], progress: "", error: null, warnings: [], success: null, checkpoint: undefined,
       initialize: async () => {
-        if (get().busy) return;
-        const signal = start("fetch"); set({ loading: true });
+        controller?.abort();
+        const signal = start("fetch"); set({ loading: true, rows: [], warnings: [], progress: "" });
         try {
           const profile = await new ProfilesRepository().get(platform);
           signal.throwIfAborted(); set({ profile, editing: !profile, candidate: null });
-          if (profile) await loadMonths(profile, signal);
-        } catch (error) { set({ error: publicError(error) }); }
-        finally { set({ loading: false, busy: null }); }
+        } catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
+        finally { if (controller?.signal === signal) set({ loading: false, busy: null }); }
+        if (!signal.aborted && get().profile && !get().error) await get().discover({ recent: true, full: true, max: 5 });
       },
       lookup: async (username) => {
         if (get().busy) return;
@@ -49,8 +45,8 @@ function platformStore(platform: Platform) {
         if (!parsed.success) { set({ error: "Enter a username of 2–30 letters, numbers, underscores or hyphens.", candidate: null }); return; }
         const signal = start("lookup"); set({ candidate: null });
         try { const candidate = await adapter.lookup(parsed.data, signal); signal.throwIfAborted(); set({ candidate }); }
-        catch (error) { set({ error: publicError(error) }); }
-        finally { set({ busy: null }); }
+        catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
+        finally { if (controller?.signal === signal) set({ busy: null }); }
       },
       saveProfile: async () => {
         if (get().busy) return;
@@ -59,20 +55,21 @@ function platformStore(platform: Platform) {
         try {
           const now = new Date().toISOString();
           const profile = await new ProfilesRepository().save({ ...candidate, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
+          signal.throwIfAborted();
           set({ profile, editing: false, candidate: null, rows: [], months: [], warnings: [], checkpoint: undefined, progress: "", success: "Profile saved on this device." });
-          await loadMonths(profile, signal);
-        } catch (error) { set({ error: publicError(error) }); }
-        finally { set({ busy: null }); }
+        } catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
+        finally { if (controller?.signal === signal) set({ busy: null }); }
+        if (!signal.aborted && !get().error) await get().discover({ recent: true, full: true, max: 5 });
       },
       edit: () => set({ editing: true, candidate: null, error: null, success: null }),
       back: () => set({ editing: !get().profile, candidate: null, error: null }),
       removeProfile: async () => {
         if (get().busy) return;
         const profile = get().profile; if (!profile) return;
-        start("save");
+        const signal = start("save");
         try { await new ProfilesRepository().remove(profile.id); set({ profile: null, candidate: null, editing: true, rows: [], months: [], warnings: [], progress: "", checkpoint: undefined, success: "Profile removed. Imported games remain in your library." }); }
-        catch (error) { set({ error: publicError(error) }); }
-        finally { set({ busy: null }); }
+        catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
+        finally { if (controller?.signal === signal) set({ busy: null }); }
       },
       cancel: () => controller?.abort(),
       discover: async (options) => {
@@ -83,12 +80,13 @@ function platformStore(platform: Platform) {
         set({ rows: [], warnings: [], progress: "Starting discovery…", checkpoint: undefined });
         let complete = false, heldBytes = 0, lastFlush = Date.now();
         let pendingRows: DiscoveryGame[] = [];
-        const flush = () => { if (pendingRows.length) { const batch = pendingRows; pendingRows = []; set((state) => ({ rows: [...state.rows, ...batch] })); lastFlush = Date.now(); } };
+        const flush = () => { if (controller?.signal !== signal || signal.aborted) return; if (pendingRows.length) { const batch = pendingRows; pendingRows = []; set((state) => ({ rows: [...state.rows, ...batch].sort((a, b) => b.playedAtMs - a.playedAtMs) })); lastFlush = Date.now(); } };
         try {
           const seen = new Set<string>();
           for await (const event of adapter.discover(profile, options, signal)) {
             signal.throwIfAborted();
-            if (event.type === "progress") set({ progress: event.message });
+            if (event.type === "archives") set({ months: event.months });
+            else if (event.type === "progress") set({ progress: event.message });
             else if (event.type === "warning") warn(event.message);
             else if (event.type === "complete") complete = !event.limited;
             else {
@@ -99,6 +97,7 @@ function platformStore(platform: Platform) {
                 const key = `${platform}:${document.game.externalId ?? document.game.normalizedPgnHash}`;
                 if (seen.has(key)) continue; seen.add(key);
                 const row: DiscoveryGame = { key, document, playedAtMs: event.game.playedAtMs ?? (Date.parse(document.game.playedAt ?? "") || 0), alreadyImported: await gamesRepository().contains(document.game) };
+                signal.throwIfAborted();
                 heldBytes += JSON.stringify(document).length * 2;
                 if (heldBytes > 25_000_000) { warn("Discovery reached its 25 MB memory budget. Narrow the range to discover more games."); complete = false; break; }
                 pendingRows.push(row); if (pendingRows.length >= 20 || Date.now() - lastFlush >= 100) flush();
@@ -106,10 +105,10 @@ function platformStore(platform: Platform) {
             }
           }
           flush();
-          if (!complete) warn("Discovery is partial or reached its limit. Use a narrower range or full refresh to find remaining games.");
-          set({ progress: `${get().rows.length} games discovered.`, checkpoint: complete && !get().warnings.length ? discoveryCheckpoint(platform, startedAt, options) : undefined });
-        } catch (error) { flush(); set({ error: publicError(error), progress: `${get().rows.length} discovered games kept.` }); }
-        finally { set({ busy: null }); }
+          if (!complete && !options.recent) warn("Discovery is partial or reached its limit. Use a narrower range or full refresh to find remaining games.");
+          set({ progress: `${get().rows.length} games discovered.`, checkpoint: !options.recent && complete && !get().warnings.length ? discoveryCheckpoint(platform, startedAt, options) : undefined });
+        } catch (error) { flush(); if (controller?.signal === signal) set({ error: publicError(error), progress: `${get().rows.length} discovered games kept.` }); }
+        finally { if (controller?.signal === signal) set({ busy: null }); }
       },
       importRows: async (keys) => {
         if (get().busy) return;
@@ -119,13 +118,15 @@ function platformStore(platform: Platform) {
         const signal = start("import");
         try {
           const report = await importDiscovered(rows, profile, get().checkpoint, signal, (count) => set({ progress: `Imported/checking ${count}/${rows.length} games…` }));
+          if (controller?.signal !== signal) { await useLibrary.getState().refresh(); return; }
           const checked: DiscoveryGame[] = [];
           for (const row of get().rows) checked.push({ ...row, alreadyImported: await gamesRepository().contains(row.document.game) });
+          if (controller?.signal !== signal) { await useLibrary.getState().refresh(); return; }
           set((state) => ({ profile: report.profile ?? state.profile, rows: checked,
             success: `${report.imported} imported · ${report.duplicates} duplicates · ${report.failed} failed${report.cancelled ? " · cancelled; saved games kept" : ""}`, warnings: [...state.warnings, ...report.errors] }));
           await useLibrary.getState().refresh();
-        } catch (error) { set({ error: publicError(error) }); }
-        finally { set({ busy: null }); }
+        } catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
+        finally { if (controller?.signal === signal) set({ busy: null }); }
       },
     };
   });

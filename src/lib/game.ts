@@ -34,9 +34,10 @@ export function tryMove(
   from: string,
   to: string,
   promotion?: PromotionPiece,
+  allowDrawContinuation = false,
 ): MoveResult {
   const chess = chessAt(game);
-  if (chess.isGameOver()) return { kind: "illegal" };
+  if (!allowDrawContinuation && chess.isGameOver()) return { kind: "illegal" };
   const candidates = chess.moves({ verbose: true }).filter(
     (move) => move.from === from && move.to === to,
   );

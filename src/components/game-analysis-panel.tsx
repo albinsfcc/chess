@@ -9,8 +9,11 @@ import { useWorkspace } from "@/store/workspace";
 import { branchLabel } from "@/lib/game-analysis/domain";
 import { changeDescription } from "@/lib/game-analysis/evaluation";
 import { formatScore } from "@/lib/engine/normalize";
+import { assessPosition } from "@/lib/game-analysis/move-quality";
+import { useAnalysis } from "@/store/analysis";
 
 export function GameAnalysisPanel() {
+  const topMoves = useAnalysis((state) => state.preferences.multiPv);
   const review = useGameAnalysis(), document = useWorkspace((state) => state.imported);
   const path = useWorkspace((state) => state.selectedPath), select = useWorkspace((state) => state.selectNode);
   const gameId = document?.game.id ?? null;
@@ -18,6 +21,7 @@ export function GameAnalysisPanel() {
   const session = review.selected;
   const current = review.positions.find((row) => row.treePath.join(".") === path.join("."));
   const played = path.length ? review.positions.find((row) => row.movePath?.join(".") === path.join(".")) : undefined;
+  const assessment = played ? assessPosition(played, review.positions) : null;
   if (!document && !review.recent.length && !review.busy && !review.error) return null;
   return <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-label="Complete-game analysis">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Game analysis</h2><GameAnalysisDialog /></div>
@@ -41,13 +45,15 @@ export function GameAnalysisPanel() {
       <p className="text-xs text-muted-foreground">Cancelled sessions keep completed results and can be resumed explicitly. Closing this tab stops computation.</p>
       {session.lastError && <p role="alert" className="text-sm text-amber-200">{session.lastError}</p>}
       <EvaluationGraph plan={review.plan} records={review.positions} selectedPath={path} select={select} />
+      {assessment && <p className="text-sm" aria-label="Move assessment"><strong>{assessment.label}</strong> — {assessment.reason}</p>}
+      <details className="text-xs text-muted-foreground"><summary>How move labels work</summary><p>Original heuristics, requiring adjacent completed results of depth 12 or more with matching engine and settings. Loss thresholds: Excellent ≤15 cp, Good ≤40, Inaccuracy ≤100, Mistake ≤250, Blunder &gt;250. Best matches the engine with ≤15 cp loss. Great also leads the second line by ≥150 cp. Brilliant instead concedes ≥3 material points in the principal reply while retaining a nonnegative score. Mate transitions are assessed separately. Labels are estimates, not proofs or platform ratings.</p></details>
       <div className="space-y-3 border-t pt-4" aria-label="Saved position analysis">
         {current ? <>
           <p className="text-sm">Ply {current.ply} · {current.label}{current.fromCache ? " · Reused cached position" : ""}</p>
           <div className="flex justify-between gap-2"><strong className="font-mono text-xl text-primary">{current.scoreBefore ? formatScore(current.scoreBefore) : "No score"}</strong><span className="text-xs text-muted-foreground">Depth {current.depth ?? "—"}</span></div>
           <p className="text-sm">Best move: <strong className="font-mono">{current.bestMoveSan ?? "No legal move"}</strong></p>
           {current.playedMoveSan && <p className="text-xs text-muted-foreground">Next recorded move: {current.playedMoveSan}</p>}
-          <ol aria-label="Saved principal variations" className="space-y-2">{current.result.lines.map((line) => <li key={line.multiPv} className="rounded-md border p-3 text-sm"><div className="flex justify-between"><span className="font-mono text-primary">#{line.multiPv} · {line.lowerBound ? "≥ " : line.upperBound ? "≤ " : ""}{formatScore(line.score)}</span><span className="text-xs">Depth {line.depth}</span></div><p className="mt-2 break-words font-mono">{line.pvSan.join(" ") || "No continuation"}</p></li>)}</ol>
+          <ol aria-label="Saved principal variations" className="space-y-2">{current.result.lines.slice(0, topMoves).map((line) => <li key={line.multiPv} className="rounded-md border p-3 text-sm"><div className="flex justify-between"><span className="font-mono text-primary">#{line.multiPv} · {line.lowerBound ? "≥ " : line.upperBound ? "≤ " : ""}{formatScore(line.score)}</span><span className="text-xs">Depth {line.depth}</span></div><p className="mt-2 break-words font-mono">{line.pvSan.join(" ") || "No continuation"}</p></li>)}</ol>
           <p className="text-xs text-muted-foreground">{current.nodes?.toLocaleString() ?? "—"} nodes · {current.elapsedMs ?? "—"} ms</p>
         </> : <p className="text-sm text-muted-foreground">This position is not analyzed in the selected session. Select a graph point or Resume to finish missing positions.</p>}
         {played && <div className="space-y-2 rounded-md border p-3 text-sm" aria-label="Played move evaluation"><p>Played move: <strong>{played.playedMoveSan}</strong></p><p>Before: {played.scoreBefore ? formatScore(played.scoreBefore) : "Pending"} · After: {played.scoreAfter ? formatScore(played.scoreAfter) : "Pending"}</p><p>{changeDescription(played.evaluationChange)}</p><p className="text-xs text-muted-foreground">Best alternative before this move: {played.bestMoveSan ?? "None"}</p></div>}

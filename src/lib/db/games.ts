@@ -76,6 +76,17 @@ export class GamesRepository {
     });
   }
 
+  async saveUserTree(id: string, previous: GameTree, next: GameTree): Promise<void> {
+    const validated = treeSchema.parse(next);
+    await this.db.transaction("rw", this.db.trees, async () => {
+      const stored = await this.db.trees.get(id);
+      if (!stored) throw new Error("The game is no longer saved locally.");
+      if (JSON.stringify(stored.tree.userBranches ?? []) !== JSON.stringify(previous.userBranches ?? [])) throw new Error("Variations changed in another tab. Reopen the game before continuing.");
+      // Never replace original PGN nodes, metadata, hashes or raw PGN.
+      await this.db.trees.put({ gameId: id, tree: { ...stored.tree, userBranches: validated.userBranches } });
+    });
+  }
+
   async delete(id: string): Promise<void> {
     await this.db.transaction("rw", [this.db.games, this.db.trees, this.db.gameAnalyses, this.db.positionAnalyses], async () => {
       await this.db.games.delete(id);

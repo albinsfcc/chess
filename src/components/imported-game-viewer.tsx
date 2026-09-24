@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { MoveList } from "./move-list";
-import type { GameNode } from "@/lib/pgn/domain";
+import { treeNode, USER_BRANCH } from "@/lib/pgn/position";
+import { mainLineReturn } from "@/lib/pgn/user-variation";
 import { useWorkspace } from "@/store/workspace";
 import { platformName } from "@/lib/platforms/domain";
 
@@ -12,28 +12,11 @@ export function ImportedGameViewer() {
   const game = useWorkspace((state) => state.game);
   const selectedPath = useWorkspace((state) => state.selectedPath);
   const select = useWorkspace((state) => state.selectNode);
-  const goTo = useWorkspace((state) => state.goTo);
-  useEffect(() => {
-    function navigate(event: KeyboardEvent) {
-      const target = event.target;
-      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || document.querySelector('[role="dialog"]')) return;
-      if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select"))) return;
-      const cursor = useWorkspace.getState().game.cursor;
-      const length = useWorkspace.getState().game.moves.length;
-      const position = { ArrowLeft: cursor - 1, ArrowRight: cursor + 1, Home: 0, End: length }[event.key];
-      if (position !== undefined) { event.preventDefault(); goTo(position); }
-    }
-    window.addEventListener("keydown", navigate);
-    return () => window.removeEventListener("keydown", navigate);
-  }, [goTo]);
   if (!imported) return null;
   const record = imported.game;
-  let line = imported.tree.mainLine;
-  let active: GameNode | undefined;
-  for (let index = 0; index < selectedPath.length; index += 2) {
-    active = line[selectedPath[index]];
-    if (index + 1 < selectedPath.length) line = active.variations[selectedPath[index + 1]];
-  }
+  const active = treeNode(imported.tree, selectedPath);
+  const branch = selectedPath[0] === USER_BRANCH ? imported.tree.userBranches?.[selectedPath[1]] : undefined;
+  const rootNode = branch ? treeNode(imported.tree, branch.root) : undefined;
   const comments = active ? [...active.commentsBefore, ...active.commentsAfter] : imported.tree.comments;
   const annotations = Object.entries(active?.annotations ?? imported.tree.annotations).filter(([key]) => key !== "comment");
   return <>
@@ -46,12 +29,14 @@ export function ImportedGameViewer() {
     </section>
     <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves & variations</h2><span className="text-xs text-muted-foreground">Ply {game.cursor} / {game.moves.length}</span></div>
+      <p role="status" className="px-5 pt-3 text-sm text-primary">{selectedPath.length > 1 ? `Variation${branch ? ` from ${rootNode ? `${rootNode.moveNumber}${rootNode.turn === "w" ? "." : "..."} ${rootNode.san}` : "starting position"}` : " (PGN)"}` : "Main line"}</p>
       <div className="max-h-[360px] overflow-auto p-3">
         {imported.tree.mainLine.length ? <MoveList nodes={imported.tree.mainLine} /> : <p className="p-2 text-sm text-muted-foreground">This game contains a starting position and no moves.</p>}
+        {imported.tree.userBranches?.map((variation, index) => <details key={index} open={selectedPath[0] === USER_BRANCH && selectedPath[1] === index} className="mt-2 border-l-2 border-primary/30 pl-2"><summary className="cursor-pointer text-sm">Local variation {index + 1} from {variation.root.length ? `ply ${variation.moves[0].ply - 1}` : "start"}</summary><MoveList nodes={variation.moves} variation /></details>)}
       </div>
       <div className="space-y-2 border-t px-5 py-3">
-        <Button variant="secondary" size="sm" onClick={() => select(game.cursor && imported.tree.mainLine.length ? [Math.min(game.cursor, imported.tree.mainLine.length) - 1] : [])}>Return to main line</Button>
-        <p className="text-xs text-muted-foreground">← / → Previous / Next · Home / End First / Last</p>
+        <Button variant="secondary" size="sm" onClick={() => select(mainLineReturn(imported.tree, selectedPath))}>Return to main line</Button>
+        <p className="text-xs text-muted-foreground">← / → Previous / Next · ↑ / ↓ First / Last (also Home / End)</p>
       </div>
       <div className="space-y-2 border-t p-5" aria-label="Position comments" aria-live="polite">
         <h3 className="text-sm font-medium">{active ? `After ${active.moveNumber}${active.turn === "w" ? "." : "..."} ${active.san}` : "Starting position"}</h3>

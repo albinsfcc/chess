@@ -34,8 +34,9 @@ export const streamEventSchema = z.discriminatedUnion("type", [
 ]);
 export type StreamEvent = z.infer<typeof streamEventSchema>;
 export type DiscoveryGame = { key: string; document: GameDocument; playedAtMs: number; alreadyImported: boolean };
-export type DiscoveryOptions = { since?: number; until?: number; max: number; full: boolean; fromMonth?: string; toMonth?: string };
+export type DiscoveryOptions = { since?: number; until?: number; max: number; full: boolean; recent?: boolean; fromMonth?: string; toMonth?: string };
 export type DiscoveryEvent =
+  | { type: "archives"; months: string[] }
   | { type: "game"; game: WireGame }
   | { type: "warning"; message: string }
   | { type: "progress"; message: string }

@@ -13,7 +13,7 @@ describe("imported game workspace", () => {
     const document = (await validatePgn(annotatedPgn)).validGames[0];
     useWorkspace.getState().openGame(document);
     expect(useWorkspace.getState().orientation).toBe("black");
-    expect(useWorkspace.getState().move("d2", "d4").kind).toBe("illegal");
+    expect(useWorkspace.getState().move("d2", "d4").kind).toBe("moved");
     useWorkspace.getState().goTo(4);
     expect(document.tree.mainLine).toHaveLength(4);
     useWorkspace.getState().closeGame();
@@ -30,6 +30,15 @@ describe("imported game workspace", () => {
     expect(useWorkspace.getState().selectedPath).toEqual([0, 0, 1, 0, 0]);
     useWorkspace.getState().selectNode([1]);
     expect(chessAt(useWorkspace.getState().game).get("e5")?.type).toBe("p");
+  });
+  it("selecting a shared main-line prefix restores main-line Next navigation", async () => {
+    const document = (await validatePgn("1. e4 e5 2. Nf3 (2. Bc4) Nc6 *")).validGames[0];
+    useWorkspace.getState().openGame(document);
+    useWorkspace.getState().selectNode([2, 0, 0]);
+    useWorkspace.getState().selectNode([0]);
+    useWorkspace.getState().goTo(3);
+    expect(useWorkspace.getState().selectedPath).toEqual([2]);
+    expect(chessAt(useWorkspace.getState().game).get("f3")?.type).toBe("n");
   });
   it("rejects unsupported variants without changing the workspace", async () => {
     const document = (await validatePgn('[Variant "Atomic"]\n1. e5 *')).unsupportedGames[0];

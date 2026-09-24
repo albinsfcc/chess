@@ -19,7 +19,7 @@ export class BackupRepository {
       if (await this.db.games.count() > 2000 || await this.db.gameAnalyses.count() > 2000 || await this.db.positionAnalyses.count() > 20_000 || await this.db.analyses.count() > 20_000) throw new Error("Backup exceeds the supported record count. Export individual PGNs or clear analysis before retrying.");
       for (const id of await this.db.games.toCollection().primaryKeys()) {
         const tree = await this.db.trees.get(id); const document = documentSchema.parse({ game: await this.db.games.get(id), tree: tree?.tree });
-        const pending = [...document.tree.mainLine];
+        const pending = [...document.tree.mainLine, ...(document.tree.userBranches ?? []).flatMap((branch) => branch.moves)];
         while (pending.length) { const node = pending.pop()!; if (++moves > 200_000) throw new Error("Backup exceeds 200,000 total moves. Export individual PGNs for a larger collection."); for (const branch of node.variations) pending.push(...branch); }
         account(document); backup.documents.push(document);
       }

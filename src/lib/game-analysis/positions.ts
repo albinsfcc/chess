@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import type { GameNode, GameTree, NodePath } from "@/lib/pgn/domain";
-import { nodePath } from "@/lib/pgn/position";
+import { nodePath, selectedLine, USER_BRANCH } from "@/lib/pgn/position";
 import { validatePosition } from "@/lib/engine/normalize";
 import type { GameAnalysis, GameAnalysisConfig, PlannedPosition, PositionAnalysis } from "./domain";
 
@@ -9,7 +9,9 @@ export function selectedBranch(path: NodePath): GameAnalysis["selectedTreePath"]
 export function generatePositions(tree: GameTree, branch: GameAnalysis["selectedTreePath"]): PlannedPosition[] {
   if (!tree.playable) throw new Error("Unsupported variant: only standard chess can be analyzed.");
   let line = tree.mainLine; const prefix: GameNode[] = [];
-  if (branch !== "main") {
+  if (branch !== "main" && branch[0] === USER_BRANCH) {
+    const selected = selectedLine(tree, [...branch, 0]); prefix.push(...selected.prefix); line = selected.line;
+  } else if (branch !== "main") {
     if (!branch.length || branch.length % 2 !== 0) throw new Error("Invalid selected variation path.");
     for (let index = 0; index < branch.length; index += 2) {
       const moveIndex = branch[index], variationIndex = branch[index + 1];

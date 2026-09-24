@@ -51,7 +51,10 @@ export function createAdapter(platform: Platform, fetcher: typeof fetch = fetch,
     },
     async *discover(profile, options, signal): AsyncGenerator<DiscoveryEvent> {
       if (platform === "chesscom") {
-        const months = chessMonths(await this.months(profile.canonicalUsername, signal), profile, options);
+        const available = await this.months(profile.canonicalUsername, signal);
+        yield { type: "archives", months: [...available].sort() };
+        const months = options.recent ? [...new Set(available)].sort().reverse() : chessMonths(available, profile, options);
+        let found = 0; const seen = new Set<string>();
         let completed = 0;
         for (const month of months) {
           signal.throwIfAborted();
@@ -60,7 +63,12 @@ export function createAdapter(platform: Platform, fetcher: typeof fetch = fetch,
             const [year, number] = month.split("-");
             const data = z.object({ games: z.array(wireGameSchema), warnings: z.array(z.string()) }).parse(await (await request("games", { username: profile.canonicalUsername, year, month: number }, signal)).json());
             for (const message of data.warnings) yield { type: "warning", message: `${month}: ${message}` };
-            for (const game of data.games) { signal.throwIfAborted(); yield { type: "game", game }; }
+            for (const game of options.recent ? [...data.games].sort((a, b) => (b.playedAtMs ?? 0) - (a.playedAtMs ?? 0)) : data.games) {
+              signal.throwIfAborted();
+              if (options.recent) { const key = game.externalId ?? game.pgn; if (seen.has(key)) continue; seen.add(key); }
+              yield { type: "game", game }; found++;
+              if (options.recent && found >= 5) { yield { type: "complete", limited: false }; return; }
+            }
             completed++;
             yield { type: "progress", message: `${completed}/${months.length} archive months complete (${month}).` };
           } catch (error) {
@@ -72,7 +80,7 @@ export function createAdapter(platform: Platform, fetcher: typeof fetch = fetch,
         yield { type: "complete", limited: completed < months.length };
       } else {
         yield { type: "progress", message: "Streaming public games from Lichess. Rate limits may pause this request; Cancel remains available." };
-        const response = await request("games", { username: profile.canonicalUsername, since: lichessSince(profile, options), until: options.until, max: options.max }, signal);
+        const response = await request("games", { username: profile.canonicalUsername, since: options.recent ? undefined : lichessSince(profile, options), until: options.recent ? undefined : options.until, max: options.recent ? 5 : options.max }, signal);
         if (!response.body) throw new PlatformError("service", "Lichess returned no games stream.");
         let complete = false;
         for await (const item of readNdjson(response.body, signal)) {

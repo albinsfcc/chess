@@ -36,7 +36,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
   const busy = !!state.busy;
   const oldest = fromMonth ?? (full ? "" : state.profile?.discoveryCheckpoint?.slice(0, 7) ?? state.months.at(-1) ?? "");
   const newest = toMonth ?? state.months.at(-1) ?? "";
-  const invalidRange = (since && until && since > until) || (oldest && newest && oldest > newest) || max < 1 || max > 1000 || !Number.isInteger(max);
+  const invalidRange = (filters.since && filters.until && filters.since > filters.until) || (since && until && since > until) || (oldest && newest && oldest > newest) || max < 1 || max > 1000 || !Number.isInteger(max);
 
   function changeFilter(key: keyof DiscoveryFilters, value: string) { setFilters((current) => ({ ...current, [key]: value })); setPage(0); }
   function requestImport(keys: string[]) {
@@ -45,13 +45,14 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
   }
   function discover() {
     setSelected(new Set()); setPage(0);
-    void state.discover({ full, max, fromMonth: oldest || undefined, toMonth: toMonth || undefined,
-      since: since ? Date.parse(`${since}T00:00:00Z`) : undefined, until: until ? Date.parse(`${until}T23:59:59.999Z`) : undefined });
+    const from = since || filters.since, through = until || filters.until;
+    void state.discover({ full: full || !!from || !!through, max, fromMonth: from ? from.slice(0, 7) : oldest || undefined, toMonth: through ? through.slice(0, 7) : toMonth || undefined,
+      since: from ? Date.parse(`${from}T00:00:00Z`) : undefined, until: through ? Date.parse(`${through}T23:59:59.999Z`) : undefined });
   }
   return <Dialog open={open} onOpenChange={(value) => {
     if (!value && busy) state.cancel();
     setOpen(value);
-    if (value) { setSelected(new Set()); setFromMonth(null); setToMonth(null); setFull(false); void state.initialize(); }
+    if (value) { setSelected(new Set()); setFromMonth(null); setToMonth(null); setFull(false); setFilters(defaultFilters); setPage(0); void state.initialize(); }
   }}>
     <DialogTrigger asChild><Button variant="outline"><ArrowDownToLine /> Import from {platformName[platform]}</Button></DialogTrigger>
     <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl">
@@ -74,7 +75,9 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
           <div><p className="font-medium">@{state.profile.username}</p><p className="mt-1 text-xs text-muted-foreground">Last sync: {state.profile.lastSyncedAt ? new Date(state.profile.lastSyncedAt).toLocaleString() : "Never"}</p></div>
           <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={busy} onClick={() => { setUsername(state.profile?.username ?? ""); state.edit(); }}>Change Profile</Button><Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmRemove(true)}>Remove Profile</Button></div>
         </div>
-        <fieldset disabled={busy} className="space-y-3 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">Recent games</h3><Button disabled={busy} onClick={() => { setFilters(defaultFilters); setSelected(new Set()); setPage(0); void state.discover({ recent: true, full: true, max: 5 }); }}>Refresh Games</Button></div>
+        <details className="rounded-lg border p-3"><summary className="cursor-pointer font-medium">More games / Filters</summary>
+        <fieldset disabled={busy} className="mt-3 space-y-3 rounded-lg border p-3">
           <legend className="px-1 text-sm font-medium">Discovery range</legend>
           {platform === "chesscom" ? <>
             <p className="text-xs text-muted-foreground">{state.months.length ? `Available archives: ${state.months[0]} through ${state.months.at(-1)}. Months are fetched one at a time.` : "No archive months loaded. Refresh Games to check again."}</p>
@@ -87,7 +90,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
           <label className="flex items-center gap-2 text-sm"><Checkbox checked={full} onCheckedChange={(value) => { setFull(value === true); setFromMonth(null); }} /> Full refresh (include older games in this range)</label>
           <p className="text-xs text-muted-foreground">Normal refresh revisits recent games and deduplicates. Use full refresh to revisit older dates.</p>
           {invalidRange && <p role="alert" className="text-sm text-destructive">Choose an ordered date range and a maximum between 1 and 1,000.</p>}
-          <Button disabled={busy || !!invalidRange} onClick={discover}>Refresh Games</Button>
+          <Button disabled={busy || !!invalidRange} onClick={discover}>Fetch matching games</Button>
         </fieldset>
 
         <fieldset className="grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-3" aria-label="Discovery filters">
@@ -101,11 +104,13 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
             ["imported", "Import status", [["all", "All statuses"], ["new", "Not imported"], ["imported", "Already imported"]]],
           ] as const).map(([key, label, options]) => <label key={key} className="text-sm">{label}<select aria-label={label} className={`${fieldClass} mt-1`} value={filters[key]} onChange={(event) => changeFilter(key, event.target.value)}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}
         </fieldset>
+        </details>
+        {state.busy === "fetch" && <div role="status" aria-label="Loading recent games" className="space-y-2"><span className="sr-only">Loading games</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />)}</div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm" aria-live="polite">{matching.length} matching · {actualSelected.length} selected · {state.rows.length} discovered</p>
           <div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => setSelected((previous) => new Set([...previous, ...visible.filter((row) => !row.alreadyImported).map((row) => row.key)]))}>Select visible</Button><Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button></div>
         </div>
-        {!matching.length && !busy && <p className="py-4 text-sm text-muted-foreground">{state.rows.length ? "No games match these filters." : "No games discovered. Refresh Games to search this range."}</p>}
+        {!matching.length && !busy && <p className="py-4 text-sm text-muted-foreground">{state.rows.length ? "No games match these filters." : "No public games found. Retry Refresh Games or open More games to choose a range."}</p>}
         <ul className="max-h-[380px] space-y-2 overflow-y-auto" aria-label="Discovered games">
           {visible.map((row) => { const game = row.document.game; return <li key={row.key} className="flex gap-3 rounded-lg border p-3">
             <Checkbox aria-label={`Select ${game.white} vs ${game.black}`} checked={selected.has(row.key) && !row.alreadyImported} disabled={busy || row.alreadyImported} onCheckedChange={(checked) => setSelected((old) => { const next = new Set(old); if (checked) next.add(row.key); else next.delete(row.key); return next; })} />

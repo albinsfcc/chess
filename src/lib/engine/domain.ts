@@ -6,9 +6,9 @@ export const ENGINE_SOURCE = "https://github.com/nmrugg/stockfish.js/tree/v19.0.
 export const PRESETS = { quick: 250, standard: 750, deep: 2000 } as const;
 export const configSchema = z.object({ preset: z.enum(["quick", "standard", "deep"]), multiPv: z.number().int().min(1).max(5) });
 export type AnalysisConfig = z.infer<typeof configSchema>;
-export const enginePreferencesSchema = configSchema.extend({ automatic: z.boolean(), showArrow: z.boolean() });
+export const enginePreferencesSchema = configSchema.extend({ automatic: z.boolean(), showArrow: z.boolean(), showThreats: z.boolean().default(false) });
 export type EnginePreferences = z.infer<typeof enginePreferencesSchema>;
-export const defaultEnginePreferences: EnginePreferences = { preset: "standard", multiPv: 3, automatic: false, showArrow: true };
+export const defaultEnginePreferences: EnginePreferences = { preset: "standard", multiPv: 3, automatic: false, showArrow: true, showThreats: false };
 export const ENGINE_PREFERENCES_KEY = "chess-review:engine-preferences:v1";
 export const scoreSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("cp"), value: z.number().int() }),

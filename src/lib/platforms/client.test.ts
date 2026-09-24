@@ -88,3 +88,29 @@ describe("bounded NDJSON reader", () => {
     await expect(readNdjson(bytes('{"large":"data"}'), new AbortController().signal, 2).next()).rejects.toThrow("limit");
   });
 });
+
+
+describe("recent-five discovery", () => {
+  it("requests newest Chess.com months first, stops at five, sorts and deduplicates", async () => {
+    const requested: string[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("archives")) return Response.json({ months: ["2026-07", "2026-08", "2026-09"] });
+      const month = url.searchParams.get("month")!; requested.push(month);
+      const dates = month === "09" ? [9, 10] : [5, 6, 7, 8];
+      return Response.json({ games: dates.map((date) => ({ ...wireFixture, externalId: String(date), playedAtMs: date })), warnings: [] });
+    });
+    const events = await collect(createAdapter("chesscom", fetcher).discover({ ...profileFixture, discoveryCheckpoint: "2026-09-23T00:00:00.000Z" }, { full: true, max: 5, recent: true }, new AbortController().signal));
+    expect(requested).toEqual(["09", "08"]);
+    expect(events.filter((event) => event.type === "game").map((event) => event.game.externalId)).toEqual(["10", "9", "8", "7", "6"]);
+    expect(events.at(-1)).toEqual({ type: "complete", limited: false });
+  });
+  it("requests the latest five Lichess games without an incremental lower bound", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input), "http://localhost"); expect(url.searchParams.get("max")).toBe("5"); expect(url.searchParams.has("since")).toBe(false);
+      return new Response(bytes(JSON.stringify({ type: "complete", count: 0, limited: false })));
+    });
+    const events = await collect(createAdapter("lichess", fetcher).discover({ ...profileFixture, platform: "lichess", latestImportedGameAt: Date.now() }, { full: false, max: 50, recent: true }, new AbortController().signal));
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
+  });
+});

@@ -5,7 +5,7 @@ import { generatePositions, positionRange, validateAssociations } from "@/lib/ga
 import { GameAnalysisRepository } from "@/lib/game-analysis/repository";
 import { gameAnalysisQueue, type QueueEvent } from "@/lib/game-analysis/queue";
 import { annotatedPgn } from "@/lib/game-analysis/export";
-import { useWorkspace } from "./workspace";
+import { useWorkspace, variationsSaved } from "./workspace";
 import { useAnalysis } from "./analysis";
 import { useLibrary } from "./library";
 
@@ -74,7 +74,7 @@ export const useGameAnalysis = create<ReviewState>((set, get) => ({
     if (get().busy) { set({ error: "Pause the current queue before starting another analysis." }); return; }
     useAnalysis.getState().stop(); useAnalysis.setState({ result: null });
     set({ selected: null, positions: [], plan: [], error: null });
-    try { await runner().start(document.game.id, branch, configuration); }
+    try { await variationsSaved(); await runner().start(document.game.id, branch, configuration); }
     catch (error) { set({ error: message(error) }); }
   },
   resume: async () => {

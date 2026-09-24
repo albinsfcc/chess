@@ -1,3 +1,4 @@
+import { validateUserBranches } from "@/lib/pgn/user-variation";
 import { backupSchema, BACKUP_MAX_BYTES, type LocalBackup } from "./backup-format";
 import { byteLength, PGN_LIMITS } from "@/lib/pgn/limits";
 import { parsePgnEntries } from "@/lib/pgn/parse";
@@ -38,9 +39,10 @@ export async function validateBackup(text: string): Promise<LocalBackup> {
     const raw = parsed.entries[0];
     if (document.game.variant !== "Standard") raw.parsed.tags = { ...raw.parsed.tags, Variant: document.game.variant } as NonNullable<typeof raw.parsed.tags>;
     const rebuilt = await normalizeGame(raw.rawPgn, raw.parsed);
-    if (canonical(rebuilt.tree) !== canonical(document.tree) || document.game.initialFen !== document.tree.initialFen || document.game.result !== document.tree.result || (document.game.analysisStatus === "unsupported") === document.tree.playable) throw new Error("Backup game tree or supported-variant status does not match its PGN.");
+    if (canonical(rebuilt.tree) !== canonical({ ...document.tree, userBranches: undefined }) || document.game.initialFen !== document.tree.initialFen || document.game.result !== document.tree.result || (document.game.analysisStatus === "unsupported") === document.tree.playable) throw new Error("Backup game tree or supported-variant status does not match its PGN.");
     if (await hashGame(document.game, document.tree) !== document.game.normalizedPgnHash) throw new Error("Backup game identity is invalid.");
-    const pending = [...document.tree.mainLine];
+    validateUserBranches(document.tree);
+    const pending = [...document.tree.mainLine, ...(document.tree.userBranches ?? []).flatMap((branch) => branch.moves)];
     while (pending.length) { const node = pending.pop()!; totalMoves++; if (totalMoves > PGN_LIMITS.moves * 10) throw new Error("Backup exceeds 200,000 total moves."); for (const branch of node.variations) pending.push(...branch); }
   }
   const sessions = new Map(backup.sessions.map((session) => [session.id, session]));

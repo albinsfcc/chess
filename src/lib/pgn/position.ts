@@ -18,14 +18,7 @@ export function nodePath(node: GameNode): NodePath { return node.id.split(".").m
 export function reconstructPosition(tree: GameTree, path: NodePath = []): TreePosition {
   if (!tree.playable) throw new Error("This variant cannot be opened on the standard chessboard.");
   if (path.length && (path.length % 2 !== 1 || path.some((index) => !Number.isInteger(index) || index < 0))) throw new Error("Invalid game-tree path.");
-  let line = tree.mainLine;
-  const prefix: GameNode[] = [];
-  for (let i = 0; i < path.length - 1; i += 2) {
-    const branch = line[path[i]]?.variations[path[i + 1]];
-    if (!branch) throw new Error("Variation no longer exists.");
-    prefix.push(...line.slice(0, path[i]));
-    line = branch;
-  }
+  const { prefix, line } = selectedLine(tree, path);
   const index = path.length ? path[path.length - 1] : -1;
   if (index >= line.length) throw new Error("Move no longer exists.");
   const nodes = [...prefix, ...line];
@@ -46,4 +39,28 @@ export function reconstructPosition(tree: GameTree, path: NodePath = []): TreePo
   });
   return { fen, sanHistory, uciHistory, currentPly: cursor, path: [...path], game,
     navigationPaths: nodes.map(nodePath), node: cursor ? nodes[cursor - 1] : null };
+}
+
+// Reserved path namespace; imported PGN paths are bounded well below this index.
+export const USER_BRANCH = 1_000_000;
+export function selectedLine(tree: GameTree, path: NodePath, visited = new Set<number>()): { prefix: GameNode[]; line: GameNode[] } {
+  if (path[0] === USER_BRANCH) {
+    const index = path[1], branch = tree.userBranches?.[index];
+    if (!branch || path.length !== 3 || visited.has(index) || visited.size >= 100) throw new Error("Invalid user variation path.");
+    visited.add(index);
+    const parent = selectedLine(tree, branch.root, visited);
+    const prefix = branch.root.length ? [...parent.prefix, ...parent.line.slice(0, branch.root.at(-1)! + 1)] : [];
+    return { prefix, line: branch.moves };
+  }
+  let line = tree.mainLine;
+  const prefix: GameNode[] = [];
+  for (let i = 0; i < path.length - 1; i += 2) {
+    const branch = line[path[i]]?.variations[path[i + 1]];
+    if (!branch) throw new Error("Variation no longer exists.");
+    prefix.push(...line.slice(0, path[i])); line = branch;
+  }
+  return { prefix, line };
+}
+export function treeNode(tree: GameTree, path: NodePath): GameNode | undefined {
+  return path.length ? selectedLine(tree, path).line[path.at(-1)!] : undefined;
 }
