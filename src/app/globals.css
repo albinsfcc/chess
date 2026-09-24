@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  --background: #101619;
+  --foreground: #edf2f3;
+  --card: #192125;
+  --card-foreground: #edf2f3;
+  --popover: #192125;
+  --popover-foreground: #edf2f3;
+  --primary: #8ddbbd;
+  --primary-foreground: #10291f;
+  --secondary: #263137;
+  --secondary-foreground: #e2ebee;
+  --muted: #202b30;
+  --muted-foreground: #a6b6be;
+  --accent: #293b39;
+  --accent-foreground: #c7f7e4;
+  --destructive: #fb8c91;
+  --border: #324047;
+  --input: #42545d;
+  --ring: #8ddbbd;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-mono: Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans; }
+  button:not(:disabled), [role="switch"] { cursor: pointer; }
+  :where(button, input, textarea, select, summary, a, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+  }
+  ::selection { background: #386454; color: white; }
+}
+
+.board-frame { box-shadow: 0 20px 60px #0004; }
+.board-with-evaluation { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.evaluation-bar { height: 26px; }
+.evaluation-white { width: var(--white-percentage); height: 100%; }
+@media (min-width: 768px) {
+  .board-with-evaluation { grid-template-columns: 44px minmax(0, 1fr); }
+  .evaluation-bar { height: auto; }
+  .evaluation-white { width: 100%; height: var(--white-percentage); }
+}
+main { overflow-wrap: anywhere; }
+[data-slot="dialog-content"] { overflow-wrap: anywhere; }
+@media (pointer: coarse) {
+  button, [role="switch"], [role="checkbox"], select { min-height: 44px; }
+  [data-slot="dialog-close"] { min-width: 44px; }
+  [data-testid="chessboard"] button { min-height: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

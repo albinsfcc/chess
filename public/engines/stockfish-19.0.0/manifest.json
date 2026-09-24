@@ -1,0 +1,19 @@
+{
+  "package": "stockfish@19.0.0",
+  "build": "lite single-threaded WASM",
+  "source": "https://github.com/nmrugg/stockfish.js/tree/v19.0.0",
+  "files": {
+    "stockfish-19-lite-single.js": {
+      "bytes": 21415,
+      "sha256": "d3344124ab067fb0b90ee77873bb8e9fbf5fc01bc525fe714b0f942581e889e6"
+    },
+    "stockfish-19-lite-single.wasm": {
+      "bytes": 1787571,
+      "sha256": "57ac2d72312aba346760e3f173f687a8c211208e97a87268436f7f0e10bb5387"
+    },
+    "COPYING.txt": {
+      "bytes": 35821,
+      "sha256": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b"
+    }
+  }
+}

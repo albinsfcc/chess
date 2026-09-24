@@ -1,0 +1,51 @@
+{
+  "name": "chess-review",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "engine:build": "node scripts/build-engine.mjs && node scripts/build-notices.mjs",
+    "predev": "npm run engine:build",
+    "prebuild": "npm run engine:build",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "test:e2e:release": "playwright test --config playwright.release.config.ts"
+  },
+  "dependencies": {
+    "@mliebelt/pgn-parser": "^1.4.19",
+    "chess.js": "^1.4.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dexie": "^4.4.6",
+    "lucide-react": "^1.47.0",
+    "next": "16.3.5",
+    "radix-ui": "^1.6.7",
+    "react": "19.2.8",
+    "react-chessboard": "^5.12.1",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "esbuild": "0.28.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "fake-indexeddb": "^6.2.5",
+    "stockfish": "19.0.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  },
+  "type": "module"
+}

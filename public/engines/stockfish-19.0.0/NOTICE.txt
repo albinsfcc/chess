@@ -1,0 +1,20 @@
+Stockfish 19 / Stockfish.js 19.0.0
+Lite single-threaded WASM build; vendor files copied without modification.
+
+Stockfish.js (c) 2026 Chess.com, LLC, by Nathan Rugg and contributors.
+Stockfish by the Stockfish developers. Distributed under GNU GPL version 3.
+Full license: COPYING.txt (distributed alongside this notice).
+
+Corresponding source, build scripts and license:
+https://github.com/nmrugg/stockfish.js/tree/v19.0.0
+Source archive: https://github.com/nmrugg/stockfish.js/archive/refs/tags/v19.0.0.tar.gz
+Release: https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0
+Release commit: 9cb3e50 (v19.0.0). Upstream Stockfish base: edb0d9d.
+Lite code/network reference is documented in that release and the loader header.
+Build recipe: ./build.js --single-threaded --lite -f (Emscripten; see upstream build.js and README).
+Package provenance: https://registry.npmjs.org/stockfish/-/stockfish-19.0.0.tgz
+Package integrity is pinned in package-lock.json; distributed file hashes are in manifest.json.
+
+This application loads these files locally in one dedicated Web Worker.
+No third-party engine CDN, server-side engine, or engine modifications are used.
+Stockfish.js has the same GPLv3 notice for the distributed loader/WASM.
