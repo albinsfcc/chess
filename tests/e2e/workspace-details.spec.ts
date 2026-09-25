@@ -102,7 +102,7 @@ test("evaluation bar shows live and persisted positions and clears on navigation
   await page.goto("/"); await expect(page.getByTestId("evaluation-bar")).toHaveText("—");
   await page.getByRole("button", { name: "Analyze Position", exact: true }).click(); await expect(page.getByTestId("evaluation-bar")).toHaveText("+0.30");
   await page.getByTestId("square-e2").click(); await page.getByTestId("square-e4").click(); await expect(page.getByTestId("evaluation-bar")).toHaveText("—");
-  await openGame(page); await page.getByRole("button", { name: "Analyze game", exact: true }).click(); await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await openGame(page); await page.getByRole("button", { name: "Review game", exact: true }).click(); await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed", { timeout: 15_000 });
   await page.reload(); await page.getByRole("button", { name: /Open Main line analysis/ }).first().click();
   await page.getByRole("button", { name: "Main line 1. e4", exact: true }).click(); await expect(page.getByTestId("evaluation-bar")).toHaveText("-0.10");

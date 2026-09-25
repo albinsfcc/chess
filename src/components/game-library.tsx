@@ -9,7 +9,7 @@ import { useLibrary } from "@/store/library";
 import { useWorkspace } from "@/store/workspace";
 import { platformName } from "@/lib/platforms/domain";
 
-export function GameLibrary() {
+export function GameLibrary({ onOpen }: { onOpen?: () => void }) {
   const { games, status, error, busyId, refresh, open, remove, page, total, setPage } = useLibrary();
   const activeId = useWorkspace((state) => state.imported?.game.id);
   const [deleting, setDeleting] = useState<GameRecord | null>(null);
@@ -29,7 +29,7 @@ export function GameLibrary() {
         <p className="mt-1 text-xs text-muted-foreground">{game.result} · {game.playedAt?.slice(0, 10) ?? "Date unknown"} · {platformName[game.source]}</p>
         <p className={`mt-2 text-xs ${game.analysisStatus === "unsupported" ? "text-amber-200" : "text-muted-foreground"}`}>{game.analysisStatus === "unsupported" ? `${game.variant} is unsupported. Saved for reference; standard board unavailable.` : game.analysisStatus === "analyzed" ? "Main line analyzed" : game.analysisStatus === "partial" ? "Analysis available · partial or selected branch" : "Not analyzed"}</p>
         <div className="mt-3 flex items-center justify-between gap-2">
-          <Button variant="secondary" size="sm" disabled={!!busyId || game.analysisStatus === "unsupported"} aria-label={`Open ${game.white} vs ${game.black}`} onClick={() => void open(game.id)}>{busyId === game.id ? "Working…" : activeId === game.id ? "Open from start" : "Open game"}</Button>
+          <Button variant="secondary" size="sm" disabled={!!busyId || game.analysisStatus === "unsupported"} aria-label={`Open ${game.white} vs ${game.black}`} onClick={async () => { await open(game.id); if (!useLibrary.getState().error) onOpen?.(); }}>{busyId === game.id ? "Working…" : activeId === game.id ? "Open from start" : "Open game"}</Button>
           <Button variant="ghost" size="icon" disabled={!!busyId} aria-label={`Delete ${game.white} vs ${game.black}`} onClick={() => setDeleting(game)}><Trash2 size={16} /></Button>
         </div>
       </li>)}

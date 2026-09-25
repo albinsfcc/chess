@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { gamesRepository, storageErrorMessage } from "@/lib/db/games";
 import type { GameRecord } from "@/lib/pgn/domain";
+import { useReviewDialog } from "./game-review";
 import { useWorkspace } from "./workspace";
 
 type LibraryState = {
@@ -30,7 +31,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   },
   open: async (id) => {
     set({ busyId: id, error: null });
-    try { useWorkspace.getState().openGame(await gamesRepository().get(id)); }
+    try { useReviewDialog.setState({automaticGameId: null}); useWorkspace.getState().openGame(await gamesRepository().get(id)); }
     catch (error) { set({ error: storageErrorMessage(error) }); }
     finally { set({ busyId: null }); }
   },

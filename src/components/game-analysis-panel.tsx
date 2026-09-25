@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { GameAnalysisDialog } from "./game-analysis-dialog";
 import { EvaluationGraph } from "./evaluation-graph";
 import { useGameAnalysis } from "@/store/game-analysis";
 import { useWorkspace } from "@/store/workspace";
@@ -14,6 +13,8 @@ import { useAnalysis } from "@/store/analysis";
 import { MoveStrengthIcon } from "./move-strength-icon";
 import { MoveStrengthLegend } from "./move-strength-legend";
 import { usableResult } from "@/lib/engine/result-quality";
+import { fullReview } from "@/lib/game-analysis/review-summary";
+import { selectedBranch, generatePositions } from "@/lib/game-analysis/positions";
 import { useOpenings } from "@/store/openings";
 
 export function GameAnalysisPanel() {
@@ -30,7 +31,8 @@ export function GameAnalysisPanel() {
   const assessment = played ? assessPosition(played, review.positions) : null;
   if (!document && !review.recent.length && !review.busy && !review.error) return null;
   return <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-label="Complete-game analysis">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Game analysis</h2><GameAnalysisDialog /></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Game analysis</h2></div>
+    {document && path.length > 1 && <Button variant="outline" disabled={review.busy} onClick={() => { try { const branch = selectedBranch(path), endPly = generatePositions(document.tree, branch).length - 1; const {preset, multiPv} = useAnalysis.getState().preferences; void review.start(branch, {preset, multiPv, startPly: 0, endPly}); } catch (error) { useGameAnalysis.setState({error: error instanceof Error ? error.message : "This branch cannot be reviewed."}); } }}>Analyze selected variation</Button>}
     {review.loading && <p role="status" className="text-sm">Loading saved analysis…</p>}
     {review.busy && <p role="status" className="text-sm text-primary">Queue active{review.active ? ` · ${review.active.completedPositions}/${review.active.totalPositions} saved` : " · preparing engine"}. Board navigation remains available.</p>}
     {review.busy && (!session || review.active?.id !== session.id) && <Button variant="outline" onClick={() => void review.pause()}>Pause active queue</Button>}
@@ -50,7 +52,7 @@ export function GameAnalysisPanel() {
       </div>
       <p className="text-xs text-muted-foreground">Cancelled sessions keep completed results and can be resumed explicitly. Closing this tab stops computation.</p>
       {session.lastError && <p role="alert" className="text-sm text-amber-200">{session.lastError}</p>}
-      <EvaluationGraph plan={review.plan} records={review.positions} selectedPath={path} select={select} />
+      {!(session.status === "completed" && fullReview(session, document.game.id, document.tree.mainLine.length)) && <EvaluationGraph plan={review.plan} records={review.positions} selectedPath={path} select={select} />}
       {assessment && <p className="flex items-start gap-2 text-sm" aria-label="Move assessment"><MoveStrengthIcon label={assessment.label} className="size-7 shrink-0" /><span><strong>{assessment.label}</strong> — {assessment.reason}</span></p>}
       <MoveStrengthLegend />
       <details className="text-xs text-muted-foreground"><summary>How move labels work</summary><p>Every move in a completed full-line analysis receives a grade. Shallow completed searches receive provisional grades; only Brilliant and Great require depth 12. Book is a known local opening continuation; Forced is the only legal move; Missed Win means an actual mate in one was available but not played. Miss means an opponent-created winning chance returned to equal or worse. Best always includes the engine?s top move, regardless of adjacent-search drift. Brilliant also considers near-best piece/exchange sacrifices over six PV plies, while excluding established winning alternatives. Ordinary labels use estimated expected-points loss: Excellent ?2%, Good ?5%, Inaccuracy ?10%, Mistake ?20%, Blunder &gt;20%. The rating-neutral logistic conversion is our approximation, not Chess.com?s unpublished rating model. Mate transitions remain separate. Partial ranges, paused sessions and other branches still need analysis; missing data is never labeled as a bad move.</p></details>

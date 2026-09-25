@@ -13,7 +13,7 @@ type ReviewState = {
   gameId: string | null; sessions: GameAnalysis[]; recent: GameAnalysis[]; selected: GameAnalysis | null;
   positions: PositionAnalysis[]; plan: PlannedPosition[]; busy: boolean; active: GameAnalysis | null; loading: boolean; error: string | null;
   load: (gameId: string | null) => Promise<void>; open: (id: string) => Promise<void>; showGame: (id: string) => Promise<void>;
-  start: (branch: GameAnalysis["selectedTreePath"], configuration: GameAnalysisConfig) => Promise<void>;
+  start: (branch: GameAnalysis["selectedTreePath"], configuration: GameAnalysisConfig, shouldStart?: () => boolean) => Promise<void>;
   resume: () => Promise<void>; pause: () => Promise<void>; cancel: () => Promise<void>; exportPgn: () => Promise<void>;
 };
 let loadSerial = 0, openSerial = 0;
@@ -69,12 +69,12 @@ export const useGameAnalysis = create<ReviewState>((set, get) => ({
     try { const session = await repository().get(id); useWorkspace.getState().openGame(await gamesRepository().get(session.gameId)); await get().load(session.gameId); await get().open(id); }
     catch (error) { set({ error: message(error) }); }
   },
-  start: async (branch, configuration) => {
+  start: async (branch, configuration, shouldStart) => {
     const document = useWorkspace.getState().imported; if (!document) return;
     if (get().busy) { set({ error: "Pause the current queue before starting another analysis." }); return; }
     useAnalysis.getState().stop(); useAnalysis.setState({ result: null });
     set({ selected: null, positions: [], plan: [], error: null });
-    try { await variationsSaved(); await runner().start(document.game.id, branch, configuration); }
+    try { await variationsSaved(); if (shouldStart && !shouldStart()) return; await runner().start(document.game.id, branch, configuration); }
     catch (error) { set({ error: message(error) }); }
   },
   resume: async () => {

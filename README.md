@@ -42,7 +42,13 @@ Only small board and engine preferences use localStorage (`chess-review:board-pr
 
 ## Complete-game analysis (Phase 5)
 
-Open an imported standard game and choose **Analyze game**. Select Quick (250 ms), Standard (750 ms), or Deep (2,000 ms), MultiPV 1–5 (default 3), and an inclusive ply range. Ply 0 is the initial position, and ply N is the position after N played moves. The final position is included by default. The workload estimate is approximate and excludes initialization/storage overhead; cache hits shorten it.
+Open an imported standard game and choose **Review game**. Review starts immediately in a progress modal, covering the complete main line from its initial position through the final position. There are no line or ply-range controls in this flow. Configure Quick (250 ms), Standard (750 ms), Deep (2,000 ms), and MultiPV 1-5 in global Settings. A matching saved review is resumed or reopened; changed settings create a separate session and preserve prior results. Workload estimates exclude initialization/storage overhead; cache hits shorten them.
+
+Closing the modal pauses the queue and preserves committed results. Reopening resumes from the first unfinished position. A paused review automatically resumes while the modal remains open and the tab is visible (including returning from a hidden tab). Engine/storage failures display Retry rather than looping indefinitely. Closing the browser does not continue computation.
+
+After completion, the modal shows the evaluation history, per-player accuracy estimates, and counts for all move classifications. **Start review** closes it, returns the board to the initial position and places the same summary at the top of the right panel. Completed summaries also remain available after reload. Selected-variation analysis remains a separate contextual action; game review always covers the main line.
+
+Accuracy v1 is a transparent local estimate: average `100 * exp(-5 * loss)` per move, with loss measured by the rating-neutral expected-points model described below. Prefer a compatible same-position MultiPV score; fall back to adjacent position evaluations. Engine-top moves score 100. Lost/allowed forced mate scores 0; other mate transitions score 100 without converting mate distances to centipawns. Missing/incompatible results and players with no moves show unavailable accuracy. This is not Chess.com's proprietary accuracy formula, and shallow searches can change after deeper review. Summaries are derived from existing IndexedDB records; no schema migration or extra engine worker is needed.
 
 - Only the main line is analyzed by default. To analyze an imported PGN branch, select its move and choose **Analyze selected variation**. Its required shared prefix and that branch are reconstructed and legally validated before starting; siblings are not scanned. Invalid moves report their exact ply, SAN, and tree path.
 - One sequential queue reserves the existing `EngineClient` worker. Live navigation, settings changes, component cleanup, and another session cannot interrupt its searches. Pause stops the active search and retains every committed result; Resume starts at the first unfinished position. Cancel also retains work and allows explicit Resume. Session search settings are immutable; start a new session for different settings.
@@ -234,3 +240,23 @@ Brilliant allows best moves or same-position MultiPV-confirmed near-best moves (
 A completed full-line analysis grades every played move. Partial ranges, paused queues and unselected branches may remain Pending. The worker retains exact UCI scores when a final update is bounded. Terminal positions receive exact chess-rule outcomes. The queue retries unusable output once, then preserves progress and reports a recoverable failure. Older completed sessions with unusable results offer **Repair missing grades**. No score is invented to fill a gap.
 
 References: [opening dataset and licence](https://github.com/lichess-org/chess-openings/tree/c67912be581f0793dbaa776be5ccf111e01f88d9), [general move classification definitions](https://support.chess.com/en/articles/8572705-how-are-moves-classified-what-is-a-blunder-or-brilliant-etc). The application About view links the distributed CC0 notice and provenance manifest.
+
+### Import-to-review workflow
+
+Platform dialogs fetch five recent games by default. Settings provides independent initial and additional batch sizes (1-50). Load more expands the recent window and merges by identity while preserving existing rows and selections; requests remain sequential and capped at 1,000 recent games. This bounded approach may refetch the recent prefix, rather than maintaining an upstream cursor. Date filters remain available for older collections.
+
+Click a platform game's name to save/open it and immediately review the full main line. A single selected supported game does the same; multi-game imports close the import dialog without starting review. Unsupported variants remain saveable but never enter the standard engine path. Already imported identities reopen their saved tree instead of creating duplicates.
+
+PGN validation runs after a 350 ms typing pause and on blur in the existing data worker. Changes abort stale validation. Successful import closes the dialog; one supported game starts review, while collections remain available in the header's Game library modal. Automatic reviews hide the redundant Review game button; closing an incomplete review exposes Resume review.
+
+Moves use aligned White/Black rows with nested variations. The move list has no nested scroll container and retains bounded pagination for large games. Scrollbar chrome is hidden globally, while touch, wheel and keyboard scrolling remain enabled.
+
+Board sounds use the six user-specified Chess.com recordings, hosted locally under public/sounds; provenance is in public/sounds/NOTICE.txt. Promotion has its own cue; checkmate and check take precedence. Invalid moves, buttons and completed reviews/manual position searches retain original Web Audio cues. Settings > Sound effects mutes all cues and persists on this device. Audio starts after interaction; hidden tabs stay silent. Assisted analysis does not chime after every automatic search.
+
+### Frost workspace UI
+
+Shared Frost tokens live in `src/app/globals.css`. The board keeps opaque user-selected squares and the existing viewport-aware sizing. A Radix tabbed inspector groups Moves, Engine, Opening and Library; inactive sections stay mounted to preserve their state and ongoing work. Game review stays reachable above the tabs, and Start review returns to Moves. The header library button selects the Library tab.
+
+Blur is limited to the toolbar, inspector, player strips and dialogs (20px desktop, 10px mobile). Inner rows use simple tinted surfaces. Static radial gradients add ambient colour. Unsupported backdrop-filter browsers receive opaque surfaces; reduced-motion preferences suppress transitions. Mobile stacks the board above the inspector and uses a horizontal evaluation bar.
+
+Visual regression smoke checks: `npx playwright test tests/e2e/frost-ui.spec.ts --config playwright.release.config.ts --project desktop` after `npm run build`. These cover desktop, tablet, portrait/landscape phones, 200% enlargement, keyboard tabs, dialog focus, imported review, variation navigation and engine controls. Screenshots are written under `artifacts/frost-*.png`.

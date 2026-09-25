@@ -45,6 +45,11 @@ export class GamesRepository {
     const games = (await this.db.games.orderBy("[libraryDate+importedAt+id]").reverse().offset(currentPage * size).limit(size).toArray()).map((game) => gameSchema.parse(game));
     return { games, total, page: currentPage };
   }
+  async findIdentity(game: GameIdentity): Promise<GameDocument | null> {
+    const row = (game.externalId ? await this.db.games.where("[source+externalId]").equals([game.source, game.externalId]).first() : undefined) ?? await this.db.games.where("[source+normalizedPgnHash]").equals([game.source, game.normalizedPgnHash]).first();
+    return row ? this.get(row.id) : null;
+  }
+
   async contains(game: GameIdentity): Promise<boolean> {
     return !!(await this.db.games.where("[source+normalizedPgnHash]").equals([game.source, game.normalizedPgnHash]).primaryKeys()).length ||
       !!(game.externalId && (await this.db.games.where("[source+externalId]").equals([game.source, game.externalId]).primaryKeys()).length);

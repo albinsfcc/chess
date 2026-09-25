@@ -1,16 +1,19 @@
 "use client";
 
 import { Settings2 } from "lucide-react";
+import { useSound } from "@/store/sound";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { defaultPreferences } from "@/lib/preferences";
 import { useWorkspace } from "@/store/workspace";
+import { ImportSettings } from "./import-settings";
 import { EngineSettings } from "@/components/engine-settings";
 const DataSettings = dynamic(() => import("@/components/data-settings").then((module) => module.DataSettings), { loading: () => <p role="status">Loading local data controls…</p> });
 
 export function SettingsDialog() {
+  const sound = useSound();
   const preferences = useWorkspace((state) => state.preferences);
   const update = useWorkspace((state) => state.updatePreferences);
   const storageError = useWorkspace((state) => state.storageError);
@@ -39,7 +42,7 @@ export function SettingsDialog() {
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" style={{ scrollbarWidth: 'none', scrollbarColor: 'transparent transparent' }}>
         <DialogHeader>
-          <DialogTitle>Board settings</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Make this board your own. Changes apply immediately.</DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-3">
@@ -101,6 +104,15 @@ export function SettingsDialog() {
           </div>
         </div>
         <EngineSettings />
+        <section className="space-y-2 border-t pt-4" aria-label="Sound settings">
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="sound-effects" className="text-sm font-medium">Sound effects</label>
+            <Switch id="sound-effects" checked={sound.enabled} onCheckedChange={sound.update} />
+          </div>
+          <p className="text-xs text-muted-foreground">Moves, captures, promotion, check, checkmate, castling, invalid moves, buttons and completed game reviews.</p>
+          {sound.error && <p role="alert" className="text-sm text-destructive">{sound.error}</p>}
+        </section>
+        <ImportSettings />
         <DataSettings />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="text-sm text-muted-foreground">Saved on this device</p>

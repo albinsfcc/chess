@@ -30,7 +30,7 @@ export function ImportedGameViewer() {
     <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves & variations</h2><span className="text-xs text-muted-foreground">Ply {game.cursor} / {game.moves.length}</span></div>
       <p role="status" className="px-5 pt-3 text-sm text-primary">{selectedPath.length > 1 ? `Variation${branch ? ` from ${rootNode ? `${rootNode.moveNumber}${rootNode.turn === "w" ? "." : "..."} ${rootNode.san}` : "starting position"}` : " (PGN)"}` : "Main line"}</p>
-      <div className="max-h-[360px] overflow-auto p-3">
+      <div className="p-3">
         {imported.tree.mainLine.length ? <MoveList nodes={imported.tree.mainLine} /> : <p className="p-2 text-sm text-muted-foreground">This game contains a starting position and no moves.</p>}
         {imported.tree.userBranches?.map((variation, index) => <details key={index} open={selectedPath[0] === USER_BRANCH && selectedPath[1] === index} className="mt-2 border-l-2 border-primary/30 pl-2"><summary className="cursor-pointer text-sm">Local variation {index + 1} from {variation.root.length ? `ply ${variation.moves[0].ply - 1}` : "start"}</summary><MoveList nodes={variation.moves} variation /></details>)}
       </div>

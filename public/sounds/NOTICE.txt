@@ -1,0 +1,9 @@
+Board sound recordings supplied by user request, downloaded unchanged from Chess.com on 2026-09-25:
+https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3
+https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3
+https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/castle.mp3
+https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3
+https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/promote.mp3
+https://images.chesscomfiles.com/chess-themes/sounds/_WEBM_/default/game-end.webm
+
+These recordings are not original application audio and are not covered by the application's or Stockfish's license. No redistribution license was supplied with these URLs.

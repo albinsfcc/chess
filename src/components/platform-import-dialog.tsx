@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowDownToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { platformName, type Platform } from "@/lib/platforms/domain";
 import { defaultFilters, filterGames, type DiscoveryFilters } from "@/lib/platforms/import-service";
+import { useImportPreferences } from "@/store/import-preferences";
+import { reviewImportedGame } from "@/store/import-review";
 import { platformStores } from "@/store/platform-import";
 
 const fieldClass = "h-9 min-w-0 w-full rounded-md border border-input bg-background px-2 text-sm";
@@ -14,6 +16,7 @@ const PAGE_SIZE = 25;
 const LARGE_IMPORT = 100;
 
 export function PlatformImportDialog({ platform }: { platform: Platform }) {
+  const action = useRef(0), preferences = useImportPreferences();
   const useImport = platformStores[platform];
   const state = useImport();
   const [open, setOpen] = useState(false);
@@ -39,9 +42,21 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
   const invalidRange = (filters.since && filters.until && filters.since > filters.until) || (since && until && since > until) || (oldest && newest && oldest > newest) || max < 1 || max > 1000 || !Number.isInteger(max);
 
   function changeFilter(key: keyof DiscoveryFilters, value: string) { setFilters((current) => ({ ...current, [key]: value })); setPage(0); }
+  async function performImport(keys: string[]) {
+    const token = ++action.current;
+    await useImport.getState().importRows(keys);
+    if (token !== action.current) return;
+    const current = useImport.getState(), rows = current.rows.filter((row) => keys.includes(row.key));
+    if (current.error || rows.length !== keys.length || rows.some((row) => !row.alreadyImported)) return;
+    try {
+      if (rows.length === 1 && rows[0].document.tree.playable) await reviewImportedGame(rows[0].document, () => token === action.current);
+      if (token !== action.current) return;
+      setOpen(false); setSelected(new Set());
+    } catch (error) { useImport.setState({error: error instanceof Error ? error.message : "Unable to open the saved game."}); }
+  }
   function requestImport(keys: string[]) {
     if (keys.length > LARGE_IMPORT) setConfirmImport(keys);
-    else void state.importRows(keys);
+    else void performImport(keys);
   }
   function discover() {
     setSelected(new Set()); setPage(0);
@@ -50,7 +65,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
       since: from ? Date.parse(`${from}T00:00:00Z`) : undefined, until: through ? Date.parse(`${through}T23:59:59.999Z`) : undefined });
   }
   return <Dialog open={open} onOpenChange={(value) => {
-    if (!value && busy) state.cancel();
+    if (!value) { action.current++; state.cancel(); }
     setOpen(value);
     if (value) { setSelected(new Set()); setFromMonth(null); setToMonth(null); setFull(false); setFilters(defaultFilters); setPage(0); void state.initialize(); }
   }}>
@@ -75,7 +90,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
           <div><p className="font-medium">@{state.profile.username}</p><p className="mt-1 text-xs text-muted-foreground">Last sync: {state.profile.lastSyncedAt ? new Date(state.profile.lastSyncedAt).toLocaleString() : "Never"}</p></div>
           <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={busy} onClick={() => { setUsername(state.profile?.username ?? ""); state.edit(); }}>Change Profile</Button><Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmRemove(true)}>Remove Profile</Button></div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">Recent games</h3><Button disabled={busy} onClick={() => { setFilters(defaultFilters); setSelected(new Set()); setPage(0); void state.discover({ recent: true, full: true, max: 5 }); }}>Refresh Games</Button></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">Recent games</h3><Button disabled={busy} onClick={() => { setFilters(defaultFilters); setSelected(new Set()); setPage(0); void state.discover({ recent: true, full: true, max: preferences.initialCount }); }}>Refresh Games</Button></div>
         <details className="rounded-lg border p-3"><summary className="cursor-pointer font-medium">More games / Filters</summary>
         <fieldset disabled={busy} className="mt-3 space-y-3 rounded-lg border p-3">
           <legend className="px-1 text-sm font-medium">Discovery range</legend>
@@ -105,7 +120,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
           ] as const).map(([key, label, options]) => <label key={key} className="text-sm">{label}<select aria-label={label} className={`${fieldClass} mt-1`} value={filters[key]} onChange={(event) => changeFilter(key, event.target.value)}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}
         </fieldset>
         </details>
-        {state.busy === "fetch" && <div role="status" aria-label="Loading recent games" className="space-y-2"><span className="sr-only">Loading games</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />)}</div>}
+        {state.busy === "fetch" && <div role="status" aria-label="Loading recent games" className="space-y-2"><span className="sr-only">Loading games</span>{Array.from({ length: preferences.initialCount }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />)}</div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm" aria-live="polite">{matching.length} matching · {actualSelected.length} selected · {state.rows.length} discovered</p>
           <div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => setSelected((previous) => new Set([...previous, ...visible.filter((row) => !row.alreadyImported).map((row) => row.key)]))}>Select visible</Button><Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button></div>
@@ -114,7 +129,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
         <ul className="max-h-[380px] space-y-2 overflow-y-auto" aria-label="Discovered games">
           {visible.map((row) => { const game = row.document.game; return <li key={row.key} className="flex gap-3 rounded-lg border p-3">
             <Checkbox aria-label={`Select ${game.white} vs ${game.black}`} checked={selected.has(row.key) && !row.alreadyImported} disabled={busy || row.alreadyImported} onCheckedChange={(checked) => setSelected((old) => { const next = new Set(old); if (checked) next.add(row.key); else next.delete(row.key); return next; })} />
-            <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium">{game.white}{game.whiteRating !== null ? ` (${game.whiteRating})` : ""} vs {game.black}{game.blackRating !== null ? ` (${game.blackRating})` : ""}</p>
+            <div className="min-w-0 flex-1"><button type="button" disabled={busy || !row.document.tree.playable} aria-label={`Import and review ${game.white} vs ${game.black}`} className="break-words text-left text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50" onClick={() => requestImport([row.key])}>{game.white}{game.whiteRating !== null ? ` (${game.whiteRating})` : ""} vs {game.black}{game.blackRating !== null ? ` (${game.blackRating})` : ""}</button>
               <p className="mt-1 break-words text-xs text-muted-foreground">{game.result} · {game.playedAt?.slice(0, 10) ?? "Date unknown"} · {game.timeControl} · {game.timeCategory} · {game.rated === undefined ? "Rating mode unknown" : game.rated ? "Rated" : "Casual"} · {platformName[game.source]} · {game.variant}</p>
               {game.analysisStatus === "unsupported" && <p className="mt-1 text-xs text-amber-200">Unsupported variant — can be saved but cannot open on the standard board.</p>}
               {row.alreadyImported && <p className="mt-1 text-xs text-primary">Already imported</p>}
@@ -122,6 +137,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
             </div>
           </li>; })}
         </ul>
+        {state.recentMode && <Button variant="outline" className="w-full" disabled={busy || !state.hasMore} onClick={() => void state.loadMore()}>{state.hasMore ? `Load ${preferences.moreCount} more games` : "No more recent games"}</Button>}
         {pages > 1 && <div className="flex items-center justify-center gap-3"><Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous page</Button><span className="text-sm">Page {currentPage + 1} of {pages}</span><Button variant="ghost" size="sm" disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>Next page</Button></div>}
         <div className="flex flex-wrap justify-end gap-2 border-t pt-3"><Button disabled={busy || !actualSelected.length} onClick={() => requestImport(actualSelected)}>Import selected</Button><Button variant="outline" disabled={busy || !available.length} onClick={() => requestImport(available)}>Import all matching ({available.length})</Button></div>
       </div>}
@@ -130,7 +146,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
       {state.error && <p role="alert" className="break-words text-sm text-destructive">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-primary">{state.success}</p>}
       {!!state.warnings.length && <details className="rounded-md border border-amber-200/30 p-3 text-sm"><summary className="cursor-pointer text-amber-200">{state.warnings.length} discovery/import notices</summary><ul className="mt-2 max-h-48 space-y-2 overflow-y-auto break-words">{state.warnings.map((message, index) => <li key={index}>{message}</li>)}</ul></details>}
-      <Dialog open={!!confirmImport} onOpenChange={(value) => { if (!value) setConfirmImport(null); }}><DialogContent><DialogHeader><DialogTitle>Import {confirmImport?.length} games?</DialogTitle><DialogDescription>This large import may take a while and uses storage on this device. Completed games are kept if you cancel.</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmImport(null)}>Cancel</Button><Button onClick={() => { const keys = confirmImport; setConfirmImport(null); if (keys) void state.importRows(keys); }}>Confirm large import</Button></div></DialogContent></Dialog>
+      <Dialog open={!!confirmImport} onOpenChange={(value) => { if (!value) setConfirmImport(null); }}><DialogContent><DialogHeader><DialogTitle>Import {confirmImport?.length} games?</DialogTitle><DialogDescription>This large import may take a while and uses storage on this device. Completed games are kept if you cancel.</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmImport(null)}>Cancel</Button><Button onClick={() => { const keys = confirmImport; setConfirmImport(null); if (keys) void performImport(keys); }}>Confirm large import</Button></div></DialogContent></Dialog>
       <Dialog open={confirmRemove} onOpenChange={setConfirmRemove}><DialogContent><DialogHeader><DialogTitle>Remove saved profile?</DialogTitle><DialogDescription>Your imported games will remain in the local library.</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmRemove(false)}>Cancel</Button><Button variant="destructive" onClick={() => { setConfirmRemove(false); void state.removeProfile(); }}>Remove saved profile</Button></div></DialogContent></Dialog>
     </DialogContent>
   </Dialog>;

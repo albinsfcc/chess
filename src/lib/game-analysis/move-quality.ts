@@ -2,7 +2,7 @@ import { Chess } from "chess.js";
 import type { EngineResult } from "../engine/domain";
 import type { PositionAnalysis } from "./domain";
 import { evaluationChange } from "./evaluation";
-import { bookContinuation } from "../openings";
+import { bookContinuation, type OpeningIndex } from "../openings";
 
 // Original, deliberately conservative heuristics; not a platform's proprietary grading.
 export const MOVE_QUALITY = { minimumDepth: 12, excellent: 0.02, good: 0.05, inaccuracy: 0.10, mistake: 0.20, greatGap: 150, sacrifice: 2, sacrificePlies: 6, healthy: -50, winning: 600, greatPointsGap: 0.15, brilliantMaxCpLoss: 30 } as const;
@@ -105,13 +105,13 @@ export function assessPosition(row: PositionAnalysis, records: PositionAnalysis[
   const book = bookContinuation(row.fen, row.playedMoveUci)?.name;
   return after ? classifyMove(row.result, after.result, row.playedMoveUci, { book, previous: records.find((candidate) => candidate.analysisId === row.analysisId && candidate.ply === row.ply - 1)?.result }) : intrinsicAssessment(row.fen, row.playedMoveUci, book);
 }
-export function assessmentMap(records: PositionAnalysis[], gameId: string | undefined, visiblePaths?: ReadonlySet<string>) {
+export function assessmentMap(records: PositionAnalysis[], gameId: string | undefined, visiblePaths?: ReadonlySet<string>, openingIndex?: OpeningIndex) {
   const byPly = new Map(records.map((row) => [`${row.analysisId}:${row.ply}`, row]));
   const assessments = new Map<string, MoveAssessment>();
   for (const row of records) {
     if (row.gameId !== gameId || !row.movePath || !row.playedMoveUci || (visiblePaths && !visiblePaths.has(row.movePath.join(".")))) continue;
     const after = byPly.get(`${row.analysisId}:${row.ply + 1}`);
-    const book = bookContinuation(row.fen, row.playedMoveUci)?.name;
+    const book = bookContinuation(row.fen, row.playedMoveUci, openingIndex)?.name;
     const assessment = after ? classifyMove(row.result, after.result, row.playedMoveUci, { book, previous: byPly.get(`${row.analysisId}:${row.ply - 1}`)?.result }) : intrinsicAssessment(row.fen, row.playedMoveUci, book);
     if (assessment) assessments.set(row.movePath.join("."), assessment);
   }

@@ -105,12 +105,12 @@ describe("recent-five discovery", () => {
     expect(events.filter((event) => event.type === "game").map((event) => event.game.externalId)).toEqual(["10", "9", "8", "7", "6"]);
     expect(events.at(-1)).toEqual({ type: "complete", limited: false });
   });
-  it("requests the latest five Lichess games without an incremental lower bound", async () => {
+  it.each([5, 50])("requests the latest %i Lichess games without an incremental lower bound", async (max) => {
     const fetcher = vi.fn<typeof fetch>(async (input) => {
-      const url = new URL(String(input), "http://localhost"); expect(url.searchParams.get("max")).toBe("5"); expect(url.searchParams.has("since")).toBe(false);
+      const url = new URL(String(input), "http://localhost"); expect(url.searchParams.get("max")).toBe(String(max)); expect(url.searchParams.has("since")).toBe(false);
       return new Response(bytes(JSON.stringify({ type: "complete", count: 0, limited: false })));
     });
-    const events = await collect(createAdapter("lichess", fetcher).discover({ ...profileFixture, platform: "lichess", latestImportedGameAt: Date.now() }, { full: false, max: 50, recent: true }, new AbortController().signal));
+    const events = await collect(createAdapter("lichess", fetcher).discover({ ...profileFixture, platform: "lichess", latestImportedGameAt: Date.now() }, { full: false, max, recent: true }, new AbortController().signal));
     expect(events.at(-1)).toMatchObject({ type: "complete" });
   });
 });

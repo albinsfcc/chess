@@ -3,7 +3,7 @@ const symbols = { q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
 const names = { q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
 export function PlayerPanel({ player }: { player: PlayerState }) {
   const side = sideName[player.color], clock = formatClock(player.clock);
-  return <div data-testid={`player-${player.color}`} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2" aria-label={`${side} player`}>
+  return <div data-testid={`player-${player.color}`} data-active={player.toMove} className="player-strip flex min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2" aria-label={`${side} player`}>
     <div className="min-w-0 space-y-1">
       <p className="break-words text-sm font-medium"><span role="img" aria-label={player.toMove ? `${side} to move` : `${side} waiting`} className={`mr-2 inline-block size-2 rounded-full ${player.toMove ? "bg-primary" : "border border-muted-foreground"}`} />{player.name}{player.rating !== null && <span className="text-xs text-muted-foreground"> ({player.rating})</span>}</p>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

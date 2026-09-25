@@ -19,11 +19,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Open Alice vs Bob", exact: true }).click();
 });
 async function start(page: Page, variation = false) {
-  await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  if (variation) await page.getByLabel("Line to analyze", { exact: true }).selectOption("variation");
-  await page.getByLabel("Game analysis preset", { exact: true }).selectOption("quick");
-  await expect(page.getByLabel("Approximate workload")).toContainText("Approximate");
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await page.getByRole("button", { name: variation ? "Analyze selected variation" : "Review game", exact: true }).click();
 }
 async function partial(page: Page) {
   await expect.poll(async () => {
@@ -34,7 +30,7 @@ async function partial(page: Page) {
 test("full-game queue pauses, reloads, resumes, navigates the graph and exports annotated PGN", async ({ page }) => {
   test.setTimeout(60_000);
   await start(page); await partial(page);
-  await page.getByRole("button", { name: "Pause queue", exact: true }).click();
+  await page.getByRole("button", { name: "Close and pause", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("paused");
   const progress = await page.getByTestId("queue-progress").textContent();
   await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("4");
@@ -72,6 +68,8 @@ test("full-game queue pauses, reloads, resumes, navigates the graph and exports 
 test("cancelled queues resume, and selected recursive variations retain separate results", async ({ page }) => {
   test.setTimeout(60_000);
   await start(page); await partial(page);
+  await page.getByRole("button", { name: "Close and pause", exact: true }).click();
+  await expect(page.getByTestId("queue-progress")).toContainText("paused");
   await page.getByRole("button", { name: "Cancel queue", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("cancelled");
   await page.getByRole("button", { name: "Resume queue", exact: true }).click();
@@ -83,9 +81,9 @@ test("cancelled queues resume, and selected recursive variations retain separate
   await expect(page.getByTestId("square-f6")).toHaveAttribute("aria-label", "f6, Black knight");
   await expect(page.getByTestId("square-d4")).toHaveAttribute("aria-label", "d4, White pawn");
   await page.getByRole("button", { name: "Return to main line", exact: true }).click();
-  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Main line · quick / 3 PV · 5/5 · completed" });
+  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Main line · standard / 3 PV · 5/5 · completed" });
   await expect(page.getByLabel("Saved position analysis")).toContainText("Depth 12");
-  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Variation 0.0.1.0 · quick / 3 PV · 3/3 · completed" });
+  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Variation 0.0.1.0 · standard / 3 PV · 3/3 · completed" });
   await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("2");
   await expect(page.getByLabel("Saved position analysis")).toContainText("After 1... Nf6");
 });

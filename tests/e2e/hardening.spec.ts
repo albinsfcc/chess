@@ -33,8 +33,8 @@ test("backup validates, restores analysis and preferences, and clearing is expli
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await page.goto("/"); await paste(page);
   await page.getByRole("button", { name: "Open Alice vs Bob", exact: true }).click();
-  await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Review game", exact: true }).click();
+  await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed", { timeout: 20_000 });
   await settings(page); await page.getByLabel("Dark squares").fill("#234567");
   const download = page.waitForEvent("download"); await page.getByRole("button", { name: "Export local backup", exact: true }).click();
@@ -104,8 +104,8 @@ test("long move lists and evaluation histories expose bounded accessible pages",
   await paste(page, `[White "Window"]\n[Black "Opponent"]\n${moves} *`);
   await page.getByRole("button", { name: "Open Window vs Opponent", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Main line \d/ })).toHaveCount(100);
-  await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Review game", exact: true }).click();
+  await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed", { timeout: 40_000 });
   await expect(page.getByLabel("Navigate evaluation graph", { exact: true }).locator("option")).toHaveCount(100);
   await page.getByRole("button", { name: "Later positions", exact: true }).click();

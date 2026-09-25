@@ -18,6 +18,7 @@ import { useBoardAnimation } from "./use-board-animation";
 import { useMoveAssessment } from "./use-move-assessment";
 import { BoardMoveBadge } from "./board-move-badge";
 import { moveHighlight } from "@/lib/board-assessment";
+import { playSound } from "@/lib/sound";
 
 const pieceNames: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 const promotions: { piece: PromotionPiece; name: string; white: string; black: string }[] = [
@@ -105,6 +106,7 @@ export function GameBoard() {
       setNotice("");
       return true;
     }
+    playSound("invalid");
     return false;
   }
 

@@ -64,8 +64,8 @@ test("completed game analysis labels moves without replacing the original notati
   const worker = (await build({ entryPoints: ["tests/fixtures/game-analysis-worker.ts"], bundle: true, write: false, format: "iife", platform: "browser" })).outputFiles[0].text;
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await page.goto("/"); await openPgn(page);
-  await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Review game", exact: true }).click();
+  await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed", { timeout: 15_000 });
   const move = page.getByRole("button", { name: "Main line 1. e4", exact: true });
   await expect(move).toContainText("Book"); await move.click();
@@ -97,8 +97,8 @@ for (const label of ["Brilliant", "Blunder"] as const) test(`${label} SVG and ma
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await page.goto("/");
   const pgn = label === "Brilliant" ? '[White "Keyboard"]\n[Black "Test"]\n[SetUp "1"]\n[FEN "r3k3/8/8/8/8/8/8/R3K3 w - - 0 1"]\n1. Ra7 *' : '[White "Keyboard"]\n[Black "Test"]\n[SetUp "1"]\n[FEN "k7/8/8/8/8/8/4P3/6K1 w - - 0 1"]\n1. e4 *';
-  await openPgn(page, pgn); await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await openPgn(page, pgn); await page.getByRole("button", { name: "Review game", exact: true }).click();
+  await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed");
   await page.getByRole("button", { name: "Last move", exact: true }).click();
   const badge = page.getByTestId("board-move-badge"), squares = label === "Brilliant" ? ["a1", "a7"] : ["e2", "e4"];

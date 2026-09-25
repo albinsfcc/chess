@@ -67,7 +67,7 @@ export function createAdapter(platform: Platform, fetcher: typeof fetch = fetch,
               signal.throwIfAborted();
               if (options.recent) { const key = game.externalId ?? game.pgn; if (seen.has(key)) continue; seen.add(key); }
               yield { type: "game", game }; found++;
-              if (options.recent && found >= 5) { yield { type: "complete", limited: false }; return; }
+              if (options.recent && found >= Math.min(1000, Math.max(1, options.max))) { yield { type: "complete", limited: false }; return; }
             }
             completed++;
             yield { type: "progress", message: `${completed}/${months.length} archive months complete (${month}).` };
@@ -80,7 +80,7 @@ export function createAdapter(platform: Platform, fetcher: typeof fetch = fetch,
         yield { type: "complete", limited: completed < months.length };
       } else {
         yield { type: "progress", message: "Streaming public games from Lichess. Rate limits may pause this request; Cancel remains available." };
-        const response = await request("games", { username: profile.canonicalUsername, since: options.recent ? undefined : lichessSince(profile, options), until: options.recent ? undefined : options.until, max: options.recent ? 5 : options.max }, signal);
+        const response = await request("games", { username: profile.canonicalUsername, since: options.recent ? undefined : lichessSince(profile, options), until: options.recent ? undefined : options.until, max: Math.min(1000, Math.max(1, options.max)) }, signal);
         if (!response.body) throw new PlatformError("service", "Lichess returned no games stream.");
         let complete = false;
         for await (const item of readNdjson(response.body, signal)) {

@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo } from "react";
+import { SoundEffects } from "./sound-effects";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, ChevronFirst, ChevronLast, Crown, FlipVertical2, LockKeyhole, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsDialog } from "@/components/settings-dialog";
@@ -13,12 +14,15 @@ import { PlayerPanel } from "./player-panel";
 import { useWorkspace } from "@/store/workspace";
 import { PgnImportDialog } from "@/components/pgn-import-dialog";
 import { GameLibrary } from "@/components/game-library";
+import { WorkspaceInspector, type InspectorSection } from "./workspace-inspector";
+import { GameAnalysisDialog } from "./game-analysis-dialog";
 import { ImportedGameViewer } from "@/components/imported-game-viewer";
 import { PlatformImportDialog } from "@/components/platform-import-dialog";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { GameAnalysisPanel } from "@/components/game-analysis-panel";
 import { connectAnalysis, useAnalysis } from "@/store/analysis";
 import { useGameAnalysis } from "@/store/game-analysis";
+import { ReviewSummaryCard } from "./review-summary";
 import { OpeningPanel } from "./opening-panel";
 
 const GameBoard = dynamic(() => import("@/components/game-board").then((module) => module.GameBoard), {
@@ -27,6 +31,7 @@ const GameBoard = dynamic(() => import("@/components/game-board").then((module) 
 });
 
 export function Workspace() {
+  const [section, setSection] = useState<InspectorSection>("moves");
   const boardHost = useBoardFit();
   const game = useWorkspace((state) => state.game);
   const imported = useWorkspace((state) => state.imported);
@@ -67,15 +72,16 @@ export function Workspace() {
 
   return (
     <div className="workspace-shell min-h-screen">
-      <header className="border-b bg-card/50">
+      <header className="workspace-header">
+        <SoundEffects />
         <div className="mx-auto flex max-w-[1920px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary"><Crown size={23} /></div>
             <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><h1 className="text-xs tracking-wide text-muted-foreground">Workspace</h1></div>
           </div>
-          <div className="flex flex-wrap items-center gap-2" aria-label="Import actions">
+          <div className="frost-toolbar flex flex-wrap items-center gap-2" aria-label="Import actions">
             <PlatformImportDialog platform="chesscom" /><PlatformImportDialog platform="lichess" /><PgnImportDialog />
-            <SettingsDialog />
+            <Button variant="ghost" onClick={() => setSection("library")}>Game library</Button><SettingsDialog />
           </div>
         </div>
       </header>
@@ -91,7 +97,7 @@ export function Workspace() {
                 <span className="text-xs text-muted-foreground">Standard chess</span>
                 <p role="status" data-testid="game-status" className={`text-sm font-medium ${chess.isCheck() ? "text-rose-300" : "text-primary"}`}>{status}</p>
               </div>
-              <div data-board-chrome data-testid="board-navigation" className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-2">
+              <div data-board-chrome data-testid="board-navigation" className="board-toolbar mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" aria-label={imported ? "First position" : "Go to start"} disabled={game.cursor === 0} onClick={() => goTo(0)}><ChevronFirst /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Previous move" : "Undo move"} disabled={game.cursor === 0} onClick={() => goTo(game.cursor - 1)}><ArrowLeft /></Button>
@@ -107,6 +113,8 @@ export function Workspace() {
           </section>
 
           <aside className="workspace-panels grid min-w-0 grid-cols-1 gap-4" aria-label="Game workspace panels" tabIndex={0}>
+            <WorkspaceInspector value={section} onChange={setSection} actions={<GameAnalysisDialog onReviewStart={() => setSection("moves")} />} panels={{ moves: <>
+            <ReviewSummaryCard />
             {imported ? <ImportedGameViewer /> : <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
               <div className="flex items-center justify-between border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves</h2><span className="font-mono text-xs text-muted-foreground">{game.cursor} / {game.moves.length} ply</span></div>
               {!game.moves.length ? (
@@ -116,7 +124,7 @@ export function Workspace() {
                   <p className="mt-2 max-w-[250px] text-sm leading-relaxed text-muted-foreground">Play either side. Your moves will appear here as you explore.</p>
                 </div>
               ) : (
-                <div className="max-h-[300px] min-h-[200px] overflow-y-auto p-3" aria-label="Move history">
+                <div className="p-3" aria-label="Move history">
                   {Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, index) => (
                     <div key={index} className="grid grid-cols-[2.5rem_1fr_1fr] items-center gap-1 rounded-md px-1 py-0.5 even:bg-background/40">
                       <span className="pl-2 font-mono text-sm text-muted-foreground">{index + 1}.</span>
@@ -130,11 +138,8 @@ export function Workspace() {
               <div className="border-t px-5 py-3 text-xs text-muted-foreground">{game.cursor < game.moves.length ? "Playing a new move here replaces the moves ahead." : "Select a move to revisit its position."}</div>
             </section>}
 
-            <OpeningPanel />
-            <GameAnalysisPanel />
-            <AnalysisPanel />
+            </>, opening: <OpeningPanel />, engine: <><AnalysisPanel /><GameAnalysisPanel /></>, library: <GameLibrary onOpen={() => setSection("moves")} /> }} />
 
-            <GameLibrary />
             {storageError && <p role="alert" className="text-sm text-destructive">{storageError}</p>}
             <footer className="flex items-center gap-2 border-t py-3 text-xs text-muted-foreground"><LockKeyhole size={13} /> Local and private. Games and preferences stay on this device.</footer>
           </aside>

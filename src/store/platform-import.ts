@@ -5,16 +5,17 @@ import { cancelled, publicError, usernameSchema, type DiscoveryGame, type Discov
 import { importDiscovered } from "@/lib/platforms/import-service";
 import { runDataTask } from "@/lib/data/client";
 import { discoveryCheckpoint } from "@/lib/platforms/refresh";
+import { useImportPreferences } from "./import-preferences";
 import { useLibrary } from "./library";
 
 type PlatformState = {
   profile: PlatformProfile | null; candidate: ProfileSummary | null; editing: boolean; loading: boolean;
   busy: "lookup" | "fetch" | "import" | "save" | null; months: string[]; rows: DiscoveryGame[];
   progress: string; error: string | null; warnings: string[]; success: string | null;
-  checkpoint: string | undefined;
+  checkpoint: string | undefined; recentLimit: number; hasMore: boolean; recentMode: boolean; loadMore: () => Promise<void>;
   initialize: () => Promise<void>; lookup: (username: string) => Promise<void>; saveProfile: () => Promise<void>;
   edit: () => void; back: () => void; removeProfile: () => Promise<void>; cancel: () => void;
-  discover: (options: DiscoveryOptions) => Promise<void>; importRows: (keys: string[]) => Promise<void>;
+  discover: (options: DiscoveryOptions, append?: boolean) => Promise<void>; importRows: (keys: string[]) => Promise<void>;
 };
 
 function platformStore(platform: Platform) {
@@ -28,16 +29,17 @@ function platformStore(platform: Platform) {
     }
     function warn(message: string) { set((state) => ({ warnings: [...state.warnings.slice(-99), message] })); }
     return {
-      profile: null, candidate: null, editing: true, loading: false, busy: null, months: [], rows: [], progress: "", error: null, warnings: [], success: null, checkpoint: undefined,
+      profile: null, candidate: null, editing: true, loading: false, busy: null, months: [], rows: [], progress: "", error: null, warnings: [], success: null, checkpoint: undefined, recentLimit: 0, hasMore: false, recentMode: true,
+      loadMore: async () => { const state = get(); if (state.busy || !state.hasMore) return; await state.discover({ recent: true, full: true, max: Math.min(1000, state.recentLimit + useImportPreferences.getState().moreCount) }, true); },
       initialize: async () => {
-        controller?.abort();
-        const signal = start("fetch"); set({ loading: true, rows: [], warnings: [], progress: "" });
+        controller?.abort(); useImportPreferences.getState().hydrate();
+        const signal = start("fetch"); set({ loading: true, rows: [], warnings: [], progress: "", hasMore: false, recentLimit: 0 });
         try {
           const profile = await new ProfilesRepository().get(platform);
           signal.throwIfAborted(); set({ profile, editing: !profile, candidate: null });
         } catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
         finally { if (controller?.signal === signal) set({ loading: false, busy: null }); }
-        if (!signal.aborted && get().profile && !get().error) await get().discover({ recent: true, full: true, max: 5 });
+        if (!signal.aborted && get().profile && !get().error) await get().discover({ recent: true, full: true, max: useImportPreferences.getState().initialCount });
       },
       lookup: async (username) => {
         if (get().busy) return;
@@ -59,7 +61,7 @@ function platformStore(platform: Platform) {
           set({ profile, editing: false, candidate: null, rows: [], months: [], warnings: [], checkpoint: undefined, progress: "", success: "Profile saved on this device." });
         } catch (error) { if (controller?.signal === signal) set({ error: publicError(error) }); }
         finally { if (controller?.signal === signal) set({ busy: null }); }
-        if (!signal.aborted && !get().error) await get().discover({ recent: true, full: true, max: 5 });
+        if (!signal.aborted && !get().error) await get().discover({ recent: true, full: true, max: useImportPreferences.getState().initialCount });
       },
       edit: () => set({ editing: true, candidate: null, error: null, success: null }),
       back: () => set({ editing: !get().profile, candidate: null, error: null }),
@@ -72,17 +74,19 @@ function platformStore(platform: Platform) {
         finally { if (controller?.signal === signal) set({ busy: null }); }
       },
       cancel: () => controller?.abort(),
-      discover: async (options) => {
+      discover: async (options, append = false) => {
         if (get().busy) return;
         const profile = get().profile; if (!profile) return;
         const signal = start("fetch");
         const startedAt = new Date().toISOString();
-        set({ rows: [], warnings: [], progress: "Starting discovery…", checkpoint: undefined });
-        let complete = false, heldBytes = 0, lastFlush = Date.now();
+        const retained = append ? get().rows : [];
+        set({ rows: retained, warnings: [], progress: "Starting discovery...", checkpoint: undefined, recentMode: !!options.recent });
+        let received = 0;
+        let complete = false, heldBytes = JSON.stringify(get().rows).length * 2, lastFlush = Date.now();
         let pendingRows: DiscoveryGame[] = [];
         const flush = () => { if (controller?.signal !== signal || signal.aborted) return; if (pendingRows.length) { const batch = pendingRows; pendingRows = []; set((state) => ({ rows: [...state.rows, ...batch].sort((a, b) => b.playedAtMs - a.playedAtMs) })); lastFlush = Date.now(); } };
         try {
-          const seen = new Set<string>();
+          const seen = new Set(get().rows.map((row) => row.key));
           for await (const event of adapter.discover(profile, options, signal)) {
             signal.throwIfAborted();
             if (event.type === "archives") set({ months: event.months });
@@ -90,6 +94,7 @@ function platformStore(platform: Platform) {
             else if (event.type === "warning") warn(event.message);
             else if (event.type === "complete") complete = !event.limited;
             else {
+              received++;
               if (get().rows.length + pendingRows.length >= 5000) { warn("Discovery stopped at 5,000 games. Narrow the date range to fetch more."); break; }
               try {
                 const document = await runDataTask("platform", event.game, signal);
@@ -105,6 +110,7 @@ function platformStore(platform: Platform) {
             }
           }
           flush();
+          if (options.recent) set({recentLimit: options.max, hasMore: received >= options.max && options.max < 1000});
           if (!complete && !options.recent) warn("Discovery is partial or reached its limit. Use a narrower range or full refresh to find remaining games.");
           set({ progress: `${get().rows.length} games discovered.`, checkpoint: !options.recent && complete && !get().warnings.length ? discoveryCheckpoint(platform, startedAt, options) : undefined });
         } catch (error) { flush(); if (controller?.signal === signal) set({ error: publicError(error), progress: `${get().rows.length} discovered games kept.` }); }

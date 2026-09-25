@@ -102,9 +102,8 @@ test("real local WASM completes a game queue using the existing worker", async (
   await page.getByRole("button", { name: "Import 1 game", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).last().click();
   await page.getByRole("button", { name: "Open Real vs Engine", exact: true }).click();
-  await page.getByRole("button", { name: "Analyze game", exact: true }).click();
-  await page.getByLabel("Game analysis preset", { exact: true }).selectOption("quick");
-  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Review game", exact: true }).click();
+    await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toHaveText("3 / 3 positions · completed", { timeout: 40_000 });
   await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("1");
   const board = new Chess(); board.move("e4");
