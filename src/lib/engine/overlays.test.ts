@@ -13,6 +13,7 @@ function result(fen = DEFAULT_POSITION, score = 100, moves = ["e2e4", "d2d4", "g
 function pair(loss: number, played = "d2d4", fen = DEFAULT_POSITION) {
   const before = result(fen), chess = new Chess(fen), color = chess.turn();
   chess.move({ from: played.slice(0, 2), to: played.slice(2, 4), promotion: played[4] });
+  if (before.bestMove !== played) before.lines = before.lines.filter((line) => line.pvUci[0] !== played);
   const after = result(chess.fen(), 100 + loss * (color === "w" ? -1 : 1));
   return { before, after, played };
 }
@@ -58,17 +59,17 @@ describe("opponent immediate threats", () => {
   });
 });
 describe("transparent move labels", () => {
-  it.each([[0, "Excellent"], [15, "Excellent"], [16, "Good"], [40, "Good"], [41, "Inaccuracy"], [100, "Inaccuracy"], [101, "Mistake"], [250, "Mistake"], [251, "Blunder"]])("grades loss %s as %s", (loss, label) => {
+  it.each([[0, "Excellent"], [30, "Excellent"], [40, "Good"], [80, "Good"], [100, "Inaccuracy"], [160, "Inaccuracy"], [200, "Mistake"], [300, "Mistake"], [400, "Blunder"]])("grades loss %s as %s", (loss, label) => {
     const { before, after, played } = pair(Number(loss)); expect(classifyMove(before, after, played)?.label).toBe(label);
   });
   it("uses Black's perspective", () => {
     const chess = new Chess(); chess.move("e4");
-    const { before, after, played } = pair(251, "e7e5", chess.fen()); expect(classifyMove(before, after, played)?.label).toBe("Blunder");
+    const { before, after, played } = pair(500, "e7e5", chess.fen()); expect(classifyMove(before, after, played)?.label).toBe("Blunder");
   });
   it("distinguishes Best from Great with a measured alternative gap", () => {
     const { before, after, played } = pair(0, "e2e4");
     expect(classifyMove(before, after, played)?.label).toBe("Best");
-    before.lines[1].score = { type: "cp", value: -50 };
+    before.lines[1].score = { type: "cp", value: -200 };
     expect(classifyMove(before, after, played)?.label).toBe("Great");
   });
   it("requires a material sacrifice, not just a positive score, for Brilliant", () => {

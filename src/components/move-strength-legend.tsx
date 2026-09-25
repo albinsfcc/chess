@@ -9,7 +9,7 @@ const descriptions: Record<MoveLabel, string> = {
   Inaccuracy: "A modest evaluation loss.", Mistake: "A substantial evaluation loss.", Blunder: "A large loss, or losing or allowing a forced mate.",
   Book: "A continuation listed in the local opening knowledge base.",
   Forced: "Exactly one legal move was available.",
-  Miss: "An opponent-created winning opportunity was lost, returning to an approximately equal position.",
+  Miss: "An opponent-created winning opportunity was lost, returning to equal or worse.",
   "Missed Win": "A legal mate in one was available, but this move did not deliver checkmate.",
 };
 export function MoveStrengthLegend() {

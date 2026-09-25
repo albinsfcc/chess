@@ -1,0 +1,53 @@
+[
+  {
+    "ply": 18,
+    "move": "Qd5+",
+    "uci": "d1d5",
+    "which": "before",
+    "fen": "r1bq3r/pppp1kpn/2n4p/2b1P3/8/2N2N2/PP3PPP/R1BQ1RK1 w - - 0 10",
+    "lines": [
+      "info depth 18 seldepth 36 multipv 1 score cp 226 nodes 806959 nps 403277 hashfull 325 time 2001 pv d1d5 f7g6 d5c5 d7d6 c5e3 c6e5 f3e5 d6e5 e3g3 g6f7 f2f4 e5e4 f4f5 h7f6 c1f4 d8e7 f4c7 f7g8 c7d6 e7f7 d6e5 g8h7 a1d1 h8e8 d1d6",
+      "info depth 18 seldepth 27 multipv 2 score cp -36 upperbound nodes 806959 nps 403277 hashfull 325 time 2001 pv b2b4 c5b4",
+      "info depth 17 seldepth 34 multipv 3 score cp -82 nodes 806959 nps 403277 hashfull 325 time 2001 pv d1b3 f7e8 b3c4 c5b6 b2b4 d8e7 b4b5 c6d8 c3d5 e7f7 c1a3 h7g5 f3h4 c7c6 d5b6 a7b6 c4b4 g5e6"
+    ],
+    "best": "bestmove d1d5 ponder f7g6"
+  },
+  {
+    "ply": 18,
+    "move": "Qd5+",
+    "uci": "d1d5",
+    "which": "after",
+    "fen": "r1bq3r/pppp1kpn/2n4p/2bQP3/8/2N2N2/PP3PPP/R1B2RK1 b - - 1 10",
+    "lines": [
+      "info depth 17 seldepth 40 multipv 1 score cp -294 nodes 778351 nps 389175 hashfull 283 time 2000 pv f7g6 d5c5 d7d6 c5e3 c6e5 f3e5 d6e5 e3g3 g6f7 f2f4 e5e4 f4f5 h7f6 c1e3 d8e7 a1d1 h8d8 e3d4 d8d7 d4f6 e7f6 c3d5 f6d6 g3b3 f7f8 f5f6 d6c5 g1h1 e4e3 f6g7 f8g7",
+      "info depth 16 seldepth 24 multipv 2 score cp -282 nodes 778351 nps 389175 hashfull 283 time 2000 pv f7e8 d5c5 h7f8 c1e3 b7b6 c5c4 c8b7 a1d1 f8e6 c4g4 e8f7 b2b4 a7a6 c3d5",
+      "info depth 16 seldepth 21 multipv 3 score cp -302 nodes 778351 nps 389175 hashfull 283 time 2000 pv f7f8 d5c5 d7d6 c5d5 d8e7 f1e1 c8g4 c3b5 a8e8 c1f4 e7f7 d5f7 f8f7 b5c7"
+    ],
+    "best": "bestmove f7g6 ponder d5c5"
+  },
+  {
+    "ply": 30,
+    "move": "Qg6+",
+    "uci": "f5g6",
+    "which": "before",
+    "fen": "r1bq2kr/pppp4/2n1np1p/4PQ2/8/5N2/PP3PPP/R1B2RK1 w - - 0 16",
+    "lines": [
+      "info depth 18 seldepth 40 multipv 1 score cp 649 nodes 769020 nps 384510 hashfull 314 time 2000 pv f5g6 e6g7 e5f6 d8f8 f1e1 h8h7 c1h6 f8f7 g6f7 g8f7 f3g5 f7f6 g5h7 f6g6 h6g7 d7d5 g7c3",
+      "info depth 18 seldepth 2 multipv 2 score cp 203 upperbound nodes 769020 nps 384510 hashfull 314 time 2000 pv e5f6",
+      "info depth 17 seldepth 35 multipv 3 score cp -243 nodes 769020 nps 384510 hashfull 314 time 2000 pv b2b4 e6g7 f5g6 c6e7 g6f6 d8f8 f1e1 g7e6 b4b5"
+    ],
+    "best": "bestmove f5g6 ponder e6g7"
+  },
+  {
+    "ply": 30,
+    "move": "Qg6+",
+    "uci": "f5g6",
+    "which": "after",
+    "fen": "r1bq2kr/pppp4/2n1npQp/4P3/8/5N2/PP3PPP/R1B2RK1 b - - 1 16",
+    "lines": [
+      "info depth 23 seldepth 25 multipv 1 score cp -637 nodes 816126 nps 408063 hashfull 336 time 2000 pv e6g7 e5f6 d8f8 f1e1 h8h7 c1h6 f8f7 g6g5 f7h5 h6g7 d7d6 g5h5 h7h5 e1e8 g8f7 e8f8 f7g6 h2h3 c6e5 f3e5 d6e5",
+      "info depth 23 seldepth 26 multipv 2 score cp -1080 nodes 816126 nps 408063 hashfull 336 time 2000 pv g8f8 e5f6 d7d5 f1e1 d8d6 c1h6 h8h6 g6h6 f8e8 h6h5 e8d7 a1d1 d5d4 h5h7 d7e8 h7g8 e8d7 f6f7 d6f8"
+    ],
+    "best": "bestmove e6g7 ponder e5f6"
+  }
+]

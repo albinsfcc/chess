@@ -8,6 +8,7 @@ async function openPgn(page: Page, pgn = '[White "Keyboard"]\n[Black "Test"]\n1.
   await expect(page.getByRole("button", { name: "Validate", exact: true })).toBeEnabled();
   await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).last().click();
   await page.getByRole("button", { name: "Open Keyboard vs Test", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Next move", exact: true })).toBeEnabled();
 }
 test("desktop board, players and navigation fit while only the cards scroll", async ({ page }) => {
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }, { width: 1024, height: 768 }]) {
