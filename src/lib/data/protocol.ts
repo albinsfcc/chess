@@ -4,6 +4,7 @@ import type { GameIdentity } from "@/lib/pgn/hash";
 import type { WireGame } from "@/lib/platforms/domain";
 import type { LocalBackup } from "./backup-format";
 export type DataTasks = {
+  openings: { input: null; output: import("@/lib/openings").OpeningIndex };
   threats: { input: string; output: ThreatResult };
   validate: { input: { input: string; existing: GameIdentity[] }; output: ImportResult };
   platform: { input: WireGame; output: GameDocument };

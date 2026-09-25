@@ -1,8 +1,19 @@
 import { Chess } from "chess.js";
 import { expect, it } from "vitest";
-import { badgeSquare, MOVE_BADGES, savedMoveAssessment } from "./board-assessment";
+import { badgeSquare, MOVE_BADGES, moveHighlight, savedMoveAssessment } from "./board-assessment";
+import { readFileSync } from "node:fs";
 import { ENGINE_BUILD, type EngineResult } from "./engine/domain";
 import type { PositionAnalysis } from "./game-analysis/domain";
+
+it("ships twelve font-independent SVGs whose colours match the move highlights", () => {
+  for (const [label, badge] of Object.entries(MOVE_BADGES)) {
+    const svg = readFileSync(`public/icons/moves/${label.toLowerCase().replaceAll(" ", "-")}.svg`, "utf8");
+    expect(svg).toContain('viewBox="0 0 64 64"'); expect(svg).toContain(`<title id="title">${label}</title>`);
+    expect(svg).toContain(`fill="${badge.color}"`); expect(svg).not.toMatch(/<text|<script|<image|href=/);
+    expect(moveHighlight({ label: label as keyof typeof MOVE_BADGES, reason: "test" })).toContain(`${badge.color}80`);
+  }
+  expect(moveHighlight(null)).toContain("#eed57166");
+});
 
 it("places every badge on its destination in either orientation", () => {
   for (const file of "abcdefgh") for (let rank = 1; rank <= 8; rank++) {
@@ -11,7 +22,7 @@ it("places every badge on its destination in either orientation", () => {
   }
   expect(badgeSquare("e4", "white")).toEqual({ column: 4, row: 4 });
   expect(badgeSquare("e4", "black")).toEqual({ column: 3, row: 3 });
-  expect(Object.keys(MOVE_BADGES)).toHaveLength(8);
+  expect(Object.keys(MOVE_BADGES)).toHaveLength(12);
   expect(MOVE_BADGES.Brilliant.symbol).toBe("!!"); expect(MOVE_BADGES.Blunder.symbol).toBe("??");
 });
 it("grades only the played move at the selected game/path/FEN, including variations", () => {
@@ -27,5 +38,5 @@ it("grades only the played move at the selected game/path/FEN, including variati
   expect(savedMoveAssessment(after.fen, "game", [], records)).toBeNull();
   expect(savedMoveAssessment(after.fen, "game", [0, 0, 0], records.slice(0, 1))).toBeNull();
   after.lines = [{ ...after.lines[0], depth: 4 }];
-  expect(savedMoveAssessment(after.fen, "game", [0, 0, 0], records)).toBeNull();
+  expect(savedMoveAssessment(after.fen, "game", [0, 0, 0], records)).toMatchObject({ label: "Best", provisional: true });
 });

@@ -1,6 +1,7 @@
 import { gamesDatabase, type GamesDatabase } from "@/lib/db/games";
 import { configurationHash } from "@/lib/engine/configuration";
 import type { EngineResult } from "@/lib/engine/domain";
+import { usableResult } from "@/lib/engine/result-quality";
 import { evaluationChange } from "./evaluation";
 import { gameAnalysisSchema, positionAnalysisSchema, type GameAnalysis, type PlannedPosition, type PositionAnalysis } from "./domain";
 
@@ -52,14 +53,15 @@ export class GameAnalysisRepository {
       const game = await this.db.games.get(session.gameId);
       if (!game) throw new Error("This game was deleted. The analysis has stopped.");
       if (current.runId !== session.runId || current.status !== "running") throw new Error("This analysis request is no longer active.");
-      if (!await this.db.positionAnalyses.get(record.id)) {
+      const existing = await this.db.positionAnalyses.get(record.id);
+      if (!existing || !usableResult(existing.result)) {
         const after = await this.db.positionAnalyses.get(`${session.id}:${position.ply + 1}`);
         if (after && record.movePath?.join(".") === after.treePath.join(".")) {
           const afterLine = after.result.lines.find((line) => line.multiPv === 1);
           record.scoreAfter = after.scoreBefore;
           record.evaluationChange = evaluationChange(record.scoreBefore, record.scoreAfter, record.mover, !!(primary?.lowerBound || primary?.upperBound || afterLine?.lowerBound || afterLine?.upperBound));
         }
-        await this.db.positionAnalyses.add(record);
+        await this.db.positionAnalyses.put(record);
       }
       const before = await this.db.positionAnalyses.get(`${session.id}:${position.ply - 1}`);
       if (before && before.movePath?.join(".") === position.treePath.join(".")) {
@@ -68,7 +70,8 @@ export class GameAnalysisRepository {
         before.evaluationChange = evaluationChange(before.scoreBefore, before.scoreAfter, before.mover, !!(beforeLine?.lowerBound || beforeLine?.upperBound || primary?.lowerBound || primary?.upperBound));
         await this.db.positionAnalyses.put(positionAnalysisSchema.parse(before));
       }
-      const count = await this.db.positionAnalyses.where("analysisId").equals(session.id).count();
+      // launch/resume recounts usable records once; each atomic commit increments once.
+      const count = current.completedPositions + (!existing || !usableResult(existing.result) ? 1 : 0);
       const completed = count === current.totalPositions;
       const next = gameAnalysisSchema.parse({ ...current, completedPositions: count, status: completed ? "completed" : "running", updatedAt: new Date().toISOString(), completedAt: completed ? new Date().toISOString() : null });
       await this.db.gameAnalyses.put(next);

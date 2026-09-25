@@ -67,14 +67,16 @@ test("completed game analysis labels moves without replacing the original notati
   await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("completed", { timeout: 15_000 });
   const move = page.getByRole("button", { name: "Main line 1. e4", exact: true });
-  await expect(move).toContainText("Good"); await move.click();
-  await expect(page.getByLabel("Move assessment", { exact: true })).toContainText("Good");
+  await expect(move).toContainText("Book"); await move.click();
+  await expect(page.getByLabel("Move assessment", { exact: true })).toContainText("Book");
   await expect(page.getByTestId("square-e4")).toHaveAttribute("aria-label", "e4, White pawn");
   const badge = page.getByTestId("board-move-badge");
   await expect(badge).toHaveAttribute("data-square", "e4");
-  await expect(badge).toHaveAccessibleName(/e4: Good/);
+  await expect(badge).toHaveAccessibleName(/e4: Book/);
+  await expect(badge.locator("img")).toHaveAttribute("src", "/icons/moves/book.svg");
+  for (const square of ["e2", "e4"]) await expect(page.getByTestId(`square-${square}`)).toHaveAttribute("data-move-strength", "Book");
   await badge.click(); await expect(badge).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("status").filter({ hasText: "e4 · Good" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "e4 · Book" })).toBeVisible();
   await page.getByTestId("chessboard").screenshot({ path: `artifacts/board-badge-${page.viewportSize()?.width}.png` });
   await page.getByRole("button", { name: "Flip", exact: true }).click();
   const square = (await page.getByTestId("square-e4").boundingBox())!, marker = (await badge.boundingBox())!;
@@ -84,7 +86,33 @@ test("completed game analysis labels moves without replacing the original notati
   await page.getByRole("button", { name: "First position", exact: true }).click(); await expect(badge).toHaveCount(0);
   await move.click(); await expect(badge).toHaveAttribute("data-square", "e4");
   await page.reload(); await page.getByRole("button", { name: "Open Keyboard vs Test", exact: true }).click();
-  await move.click(); await expect(badge).toHaveAccessibleName(/e4: Good/);
+  await move.click(); await expect(badge).toHaveAccessibleName(/e4: Book/);
   await page.getByTestId("square-d7").click(); await page.getByTestId("square-d5").click();
-  await expect(badge).toHaveCount(0);
+  await expect(badge).toHaveAccessibleName(/d5: Book/);
+});
+
+for (const label of ["Brilliant", "Blunder"] as const) test(`${label} SVG and matching previous-move highlights survive flipping and clear on reset`, async ({ page }) => {
+  const worker = (await build({ entryPoints: ["tests/fixtures/strength-worker.ts"], bundle: true, write: false, format: "iife", platform: "browser" })).outputFiles[0].text;
+  await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
+  await page.goto("/");
+  const pgn = label === "Brilliant" ? '[White "Keyboard"]\n[Black "Test"]\n[SetUp "1"]\n[FEN "r3k3/8/8/8/8/8/8/R3K3 w - - 0 1"]\n1. Ra7 *' : '[White "Keyboard"]\n[Black "Test"]\n[SetUp "1"]\n[FEN "k7/8/8/8/8/8/4P3/6K1 w - - 0 1"]\n1. e4 *';
+  await openPgn(page, pgn); await page.getByRole("button", { name: "Analyze game", exact: true }).click();
+  await page.getByRole("button", { name: "Start game analysis", exact: true }).click();
+  await expect(page.getByTestId("queue-progress")).toContainText("completed");
+  await page.getByRole("button", { name: "Last move", exact: true }).click();
+  const badge = page.getByTestId("board-move-badge"), squares = label === "Brilliant" ? ["a1", "a7"] : ["e2", "e4"];
+  await expect(badge).toHaveAccessibleName(new RegExp(label));
+  await expect(badge.locator("img")).toHaveAttribute("src", `/icons/moves/${label.toLowerCase()}.svg`);
+  const color = label === "Brilliant" ? "33, 182, 165" : "237, 81, 70";
+  for (const square of squares) {
+    await expect(page.getByTestId(`square-${square}`)).toHaveAttribute("data-move-strength", label);
+    expect(await page.getByTestId(`square-${square}`).evaluate((element) => getComputedStyle(element).backgroundImage)).toContain(color);
+  }
+  await page.getByTestId("chessboard").screenshot({ path: `artifacts/strength-${label}-${page.viewportSize()?.width}.png` });
+  await page.getByRole("button", { name: "Flip", exact: true }).click(); await expect(badge).toHaveAttribute("data-square", squares[1]);
+  await page.getByRole("button", { name: "First position", exact: true }).click();
+  await expect(badge).toHaveCount(0); await expect(page.locator("[data-move-strength]")).toHaveCount(0);
+  await page.getByText("Move strength icons", { exact: true }).click();
+  await expect(page.getByLabel("Move strength legend").locator("img")).toHaveCount(12);
+  await page.getByLabel("Move strength legend").screenshot({ path: `artifacts/strength-legend-${page.viewportSize()?.width}.png` });
 });

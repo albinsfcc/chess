@@ -85,6 +85,28 @@ describe("evaluation facts", () => {
   });
 });
 describe("persisted sequential queue", () => {
+  it("retries empty engine output and completes with usable grades", async () => {
+    engine.analyze.mockImplementationOnce(async (fen, configuration) => ({ ...result(fen, configuration), lines: [] }));
+    await queue.start(document.game.id, "main", config);
+    expect((await saved()).status).toBe("completed"); expect(engine.analyze).toHaveBeenCalledTimes(6);
+    expect((await sessions.positions((await saved()).id)).every((row) => row.result.lines.length)).toBe(true);
+  });
+  it("fails recoverably rather than completing a session with missing scores", async () => {
+    engine.analyze.mockImplementationOnce(async (fen, configuration) => result(fen, configuration))
+      .mockImplementationOnce(async (fen, configuration) => ({ ...result(fen, configuration), lines: [] }))
+      .mockImplementationOnce(async (fen, configuration) => ({ ...result(fen, configuration), lines: [] }));
+    await queue.start(document.game.id, "main", config); const partial = await saved();
+    expect(partial).toMatchObject({ status: "failed", completedPositions: 1, lastError: expect.stringContaining("no usable exact evaluation") });
+    await queue.resume(partial.id); expect((await saved()).status).toBe("completed");
+  });
+  it("repairs legacy unscored records without duplicating or losing completed positions", async () => {
+    await queue.start(document.game.id, "main", config); const session = await saved(), rows = await sessions.positions(session.id);
+    for (const row of rows.slice(0, 2)) await db.positionAnalyses.put({ ...row, result: { ...row.result, lines: [] } });
+    await queue.resume(session.id);
+    expect((await saved()).completedPositions).toBe(5); expect((await saved()).status).toBe("completed");
+    const repaired = await sessions.positions(session.id); expect(repaired).toHaveLength(5); expect(repaired.every((row) => row.result.lines.length)).toBe(true);
+    expect(repaired[4].createdAt).toBe(rows[4].createdAt);
+  });
   it("completes, caches, associates results, and reuses shared branch positions", async () => {
     await queue.start(document.game.id, "main", config);
     const session = await saved(); expect(session).toMatchObject({ status: "completed", completedPositions: 5, totalPositions: 5 });

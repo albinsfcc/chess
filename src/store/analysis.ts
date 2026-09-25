@@ -6,6 +6,7 @@ import { defaultEnginePreferences, enginePreferencesSchema, ENGINE_PREFERENCES_K
 import { AnalysisRepository } from "@/lib/engine/repository";
 import { useWorkspace } from "./workspace";
 import { classifyMove, type MoveAssessment } from "@/lib/game-analysis/move-quality";
+import { bookContinuation } from "@/lib/openings";
 
 type AnalysisState = {
   assessment: MoveAssessment | null;
@@ -23,7 +24,9 @@ async function assessLastMove(result: EngineResult, token: number) {
     const previous = chessAt({ ...game, cursor: game.cursor - 1 });
     const before = await new AnalysisRepository().get(previous.fen(), result.engineVersion, result.config);
     const move = game.moves[game.cursor - 1];
-    if (token === serial && before) useAnalysis.setState({ assessment: classifyMove(before, result, `${move.from}${move.to}${move.promotion ?? ""}`) });
+    const previousResult = game.cursor > 1 ? await new AnalysisRepository().get(chessAt({ ...game, cursor: game.cursor - 2 }).fen(), result.engineVersion, result.config) : null;
+    const uci = `${move.from}${move.to}${move.promotion ?? ""}`;
+    if (token === serial && before) useAnalysis.setState({ assessment: classifyMove(before, result, uci, { book: bookContinuation(before.fen, uci)?.name, previous: previousResult ?? undefined }) });
   } catch { /* Missing adjacent data leaves this move ungraded. */ }
 }
 function refreshThreats() {

@@ -5,6 +5,7 @@ import { configurationHash } from "@/lib/engine/configuration";
 import { gameConfigSchema, type GameAnalysis, type GameAnalysisConfig } from "./domain";
 import { generatePositions, positionRange, validateAssociations } from "./positions";
 import { GameAnalysisRepository } from "./repository";
+import { usableResult, withTerminalScore } from "@/lib/engine/result-quality";
 
 export type QueueEvent = { type: "session"; session: GameAnalysis } | { type: "busy"; busy: boolean } | { type: "error"; message: string };
 export type EngineForQueue = Pick<EngineClient, "ready" | "analyze" | "stop" | "newGame" | "acquire">;
@@ -72,16 +73,21 @@ export class GameAnalysisQueue {
         this.sessionId = session.id;
         const existing = await this.sessions.positions(session.id);
         validateAssociations(session, positions, existing);
-        const done = new Set(existing.map((row) => row.ply));
+        const done = new Set(existing.filter((row) => usableResult(row.result)).map((row) => row.ply));
         session = await this.sessions.update(session.id, { status: "running", completedPositions: done.size, runId: this.owner, lastError: undefined, completedAt: null });
         this.emit({ type: "session", session }); this.engine.newGame(this.owner);
         for (const position of positions) {
           signal.throwIfAborted(); if (done.has(position.ply)) continue;
           currentPly = position.ply;
-          let result = await this.cache.get(position.fen, version, configuration); const fromCache = result !== null;
+          let result = await this.cache.get(position.fen, version, configuration);
+          if (result) result = withTerminalScore(result);
+          if (result && !usableResult(result)) result = null;
+          const fromCache = result !== null;
           signal.throwIfAborted();
           if (!result) {
-            result = await this.engine.analyze(position.fen, configuration, this.owner); signal.throwIfAborted();
+            result = withTerminalScore(await this.engine.analyze(position.fen, configuration, this.owner)); signal.throwIfAborted();
+            if (!usableResult(result)) { result = withTerminalScore(await this.engine.analyze(position.fen, configuration, this.owner)); signal.throwIfAborted(); }
+            if (!usableResult(result)) throw new Error("The engine returned no usable exact evaluation after retry. Resume to retry this position; no grade has been invented.");
             await this.cache.save(result);
           }
           signal.throwIfAborted();

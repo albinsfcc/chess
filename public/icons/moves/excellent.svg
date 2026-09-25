@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Excellent</title>
+  <circle cx="32" cy="32" r="30.5" fill="#72a449" stroke="#28352e" stroke-width="1.5"/>
+  <rect x="13" y="29" width="8" height="22" rx="2" fill="#fff"/><path d="M25 48V29l8-14c2-3 6-2 6 2v10h10c4 0 5 3 4 6l-4 13c-1 3-3 4-6 4H29z" fill="#fff"/>
+</svg>

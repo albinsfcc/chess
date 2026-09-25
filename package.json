@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "engine:build": "node scripts/build-engine.mjs && node scripts/build-notices.mjs",
+    "engine:build": "node scripts/build-engine.mjs && node scripts/build-notices.mjs && node scripts/build-openings.mjs",
     "predev": "npm run engine:build",
     "prebuild": "npm run engine:build",
     "dev": "next dev",

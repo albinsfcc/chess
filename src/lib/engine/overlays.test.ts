@@ -77,12 +77,12 @@ describe("transparent move labels", () => {
     expect(classifyMove(before, after, played)?.label).toBe("Brilliant");
     before.lines[0].pvUci = [played]; expect(classifyMove(before, after, played)?.label).toBe("Best");
   });
-  it("leaves shallow, bounded, stale or incompatible analysis ungraded", () => {
+  it("grades shallow results provisionally but rejects bounded, stale or incompatible scores", () => {
     const { before, after, played } = pair(0);
     expect(classifyMove(before, { ...after, engineVersion: "other" }, played)).toBeNull();
     expect(classifyMove(before, { ...after, fen: DEFAULT_POSITION }, played)).toBeNull();
     expect(classifyMove(before, { ...after, config: { ...after.config, multiPv: 1 } }, played)).toBeNull();
-    before.lines[0].depth = 2; expect(classifyMove(before, after, played)).toBeNull();
+    before.lines[0].depth = 2; expect(classifyMove(before, after, played)).toMatchObject({ label: "Excellent", provisional: true });
     before.lines[0].depth = 16; before.lines[0].lowerBound = true; expect(classifyMove(before, after, played)).toBeNull();
   });
   it("handles forced mate separately without invented cp values", () => {

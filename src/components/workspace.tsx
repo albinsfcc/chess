@@ -19,6 +19,7 @@ import { AnalysisPanel } from "@/components/analysis-panel";
 import { GameAnalysisPanel } from "@/components/game-analysis-panel";
 import { connectAnalysis, useAnalysis } from "@/store/analysis";
 import { useGameAnalysis } from "@/store/game-analysis";
+import { OpeningPanel } from "./opening-panel";
 
 const GameBoard = dynamic(() => import("@/components/game-board").then((module) => module.GameBoard), {
   ssr: false,
@@ -129,6 +130,7 @@ export function Workspace() {
               <div className="border-t px-5 py-3 text-xs text-muted-foreground">{game.cursor < game.moves.length ? "Playing a new move here replaces the moves ahead." : "Select a move to revisit its position."}</div>
             </section>}
 
+            <OpeningPanel />
             <GameAnalysisPanel />
             <AnalysisPanel />
 

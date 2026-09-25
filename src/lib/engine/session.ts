@@ -1,6 +1,7 @@
 import { ENGINE_BUILD, PRESETS, searchSchema, type EngineResult, type SearchRequest, type WorkerCommand, type WorkerEvent } from "./domain";
 import { normalizeInfo, pvToSan, validatePosition } from "./normalize";
 import { parseUci, type UciInfo } from "./uci";
+import { withTerminalScore } from "./result-quality";
 
 /** UCI state machine, executed only in the worker. Drains bestmove + readyok
  * before changing positions: UCI output itself has no request identifiers. */
@@ -9,7 +10,7 @@ export class UciSession {
   private ready = false;
   private barrier = false;
   private version = "Stockfish 19";
-  private active: { request: SearchRequest; lines: Map<number, UciInfo>; cancelled: boolean } | null = null;
+  private active: { request: SearchRequest; lines: Map<number, UciInfo>; exact: Map<number, UciInfo>; cancelled: boolean } | null = null;
   private pending: SearchRequest | null = null;
   private resetPending = false;
   private publishTimer: ReturnType<typeof setTimeout> | undefined;
@@ -42,7 +43,7 @@ export class UciSession {
     }
     const request = this.pending; if (!request) return;
     this.pending = null;
-    this.active = { request, lines: new Map(), cancelled: false };
+    this.active = { request, lines: new Map(), exact: new Map(), cancelled: false };
     this.send(`setoption name MultiPV value ${request.config.multiPv}`);
     this.send(`position fen ${request.fen}`);
     this.send(`go movetime ${PRESETS[request.config.preset]}`);
@@ -63,6 +64,7 @@ export class UciSession {
       } else if (event.type === "info") {
         if (!this.active || this.active.cancelled || event.multiPv > this.active.request.config.multiPv) continue;
         const previous = this.active.lines.get(event.multiPv);
+        if (!event.lowerBound && !event.upperBound) this.active.exact.set(event.multiPv, event);
         if (!previous || event.depth >= previous.depth) this.active.lines.set(event.multiPv, event);
         // Convert SAN and publish at most 8 times/sec; never forward raw UCI.
         this.publishTimer ??= setTimeout(() => { this.publishTimer = undefined; this.publish(false); }, 125);
@@ -76,11 +78,11 @@ export class UciSession {
   private publish(complete: boolean, best?: string | null, ponder?: string) {
     const active = this.active; if (!active || active.cancelled) return;
     const { request } = active;
-    const lines = [...active.lines.values()].sort((a, b) => a.multiPv - b.multiPv).map((info) => normalizeInfo(request.fen, info));
+    const lines = [...active.lines.values()].sort((a, b) => a.multiPv - b.multiPv).map((info) => normalizeInfo(request.fen, complete && (info.lowerBound || info.upperBound) ? active.exact.get(info.multiPv) ?? info : info));
     const move = best === undefined ? lines[0]?.pvUci[0] ?? null : best;
     const san = move ? pvToSan(request.fen, [move]).san[0] ?? null : null;
     const result: EngineResult = { ...request, engineBuild: ENGINE_BUILD, engineVersion: this.version, lines, bestMove: san ? move : null, bestMoveSan: san, ...(ponder ? { ponderMove: ponder } : {}) };
-    this.emit({ type: "result", result, complete });
+    this.emit({ type: "result", result: complete ? withTerminalScore(result) : result, complete });
   }
   fail(message: string) { this.failed = true; this.dispose(); this.emit({ type: "error", message }); }
   private clearPublish() { clearTimeout(this.publishTimer); this.publishTimer = undefined; }

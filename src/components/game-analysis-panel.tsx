@@ -11,14 +11,20 @@ import { changeDescription } from "@/lib/game-analysis/evaluation";
 import { formatScore } from "@/lib/engine/normalize";
 import { assessPosition } from "@/lib/game-analysis/move-quality";
 import { useAnalysis } from "@/store/analysis";
+import { MoveStrengthIcon } from "./move-strength-icon";
+import { MoveStrengthLegend } from "./move-strength-legend";
+import { usableResult } from "@/lib/engine/result-quality";
+import { useOpenings } from "@/store/openings";
 
 export function GameAnalysisPanel() {
+  useOpenings((state) => state.index);
   const topMoves = useAnalysis((state) => state.preferences.multiPv);
   const review = useGameAnalysis(), document = useWorkspace((state) => state.imported);
   const path = useWorkspace((state) => state.selectedPath), select = useWorkspace((state) => state.selectNode);
   const gameId = document?.game.id ?? null;
   useEffect(() => { void useGameAnalysis.getState().load(gameId); }, [gameId]);
   const session = review.selected;
+  const needsRepair = review.positions.some((row) => !usableResult(row.result));
   const current = review.positions.find((row) => row.treePath.join(".") === path.join("."));
   const played = path.length ? review.positions.find((row) => row.movePath?.join(".") === path.join(".")) : undefined;
   const assessment = played ? assessPosition(played, review.positions) : null;
@@ -38,15 +44,16 @@ export function GameAnalysisPanel() {
       </div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={!review.busy || review.active?.id !== session.id} onClick={() => void review.pause()}>Pause queue</Button>
-        <Button disabled={review.busy || session.status === "completed"} onClick={() => void review.resume()}>Resume queue</Button>
+        <Button disabled={review.busy || (session.status === "completed" && !needsRepair)} onClick={() => void review.resume()}>{needsRepair && session.status === "completed" ? "Repair missing grades" : "Resume queue"}</Button>
         <Button variant="outline" disabled={session.status === "completed" || session.status === "cancelled"} onClick={() => void review.cancel()}>Cancel queue</Button>
         <Button variant="ghost" disabled={!review.positions.length} onClick={() => void review.exportPgn()}>Export annotated PGN</Button>
       </div>
       <p className="text-xs text-muted-foreground">Cancelled sessions keep completed results and can be resumed explicitly. Closing this tab stops computation.</p>
       {session.lastError && <p role="alert" className="text-sm text-amber-200">{session.lastError}</p>}
       <EvaluationGraph plan={review.plan} records={review.positions} selectedPath={path} select={select} />
-      {assessment && <p className="text-sm" aria-label="Move assessment"><strong>{assessment.label}</strong> — {assessment.reason}</p>}
-      <details className="text-xs text-muted-foreground"><summary>How move labels work</summary><p>Original heuristics, requiring adjacent completed results of depth 12 or more with matching engine and settings. Loss thresholds: Excellent ≤15 cp, Good ≤40, Inaccuracy ≤100, Mistake ≤250, Blunder &gt;250. Best matches the engine with ≤15 cp loss. Great also leads the second line by ≥150 cp. Brilliant instead concedes ≥3 material points in the principal reply while retaining a nonnegative score. Mate transitions are assessed separately. Labels are estimates, not proofs or platform ratings.</p></details>
+      {assessment && <p className="flex items-start gap-2 text-sm" aria-label="Move assessment"><MoveStrengthIcon label={assessment.label} className="size-7 shrink-0" /><span><strong>{assessment.label}</strong> — {assessment.reason}</span></p>}
+      <MoveStrengthLegend />
+      <details className="text-xs text-muted-foreground"><summary>How move labels work</summary><p>Every move in a completed full-line analysis receives a grade. Shallow completed searches receive provisional grades; only Brilliant and Great require depth 12. Book is a known local opening continuation; Forced is the only legal move; Missed Win means an actual mate in one was available but not played. Miss means an opponent-created winning chance (+2.00 or more) returned to roughly equal (±0.50). Ordinary loss thresholds: Excellent ≤15 cp, Good ≤40, Inaccuracy ≤100, Mistake ≤250, Blunder &gt;250. Mate transitions remain separate. Partial ranges, paused sessions and other branches still need analysis; missing data is never labeled as a bad move.</p></details>
       <div className="space-y-3 border-t pt-4" aria-label="Saved position analysis">
         {current ? <>
           <p className="text-sm">Ply {current.ply} · {current.label}{current.fromCache ? " · Reused cached position" : ""}</p>

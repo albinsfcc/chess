@@ -17,6 +17,7 @@ import { EvaluationBar } from "./evaluation-bar";
 import { useBoardAnimation } from "./use-board-animation";
 import { useMoveAssessment } from "./use-move-assessment";
 import { BoardMoveBadge } from "./board-move-badge";
+import { moveHighlight } from "@/lib/board-assessment";
 
 const pieceNames: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 const promotions: { piece: PromotionPiece; name: string; white: string; black: string }[] = [
@@ -71,7 +72,7 @@ export function GameBoard() {
   const destinations = legalDestinations(chess, selected, !readOnly && !pending, exploring);
   const squareStyles: Record<string, CSSProperties> = {};
   if (lastMove) {
-    for (const square of [lastMove.from, lastMove.to]) squareStyles[square] = { backgroundImage: "linear-gradient(#eed57166, #eed57166)" };
+    for (const square of [lastMove.from, lastMove.to]) squareStyles[square] = { backgroundImage: moveHighlight(assessment) };
   }
   if (selected) {
     squareStyles[selected] = { boxShadow: "inset 0 0 0 4px #226e59" };
@@ -175,6 +176,7 @@ export function GameBoard() {
               aria-pressed={selected === square}
               data-testid={`square-${square}`}
               data-last-move={lastMove?.from === square || lastMove?.to === square ? "true" : undefined}
+              data-move-strength={lastMove && (lastMove.from === square || lastMove.to === square) ? assessment?.label : undefined}
               data-check={king === square ? "true" : undefined}
               data-legal-destination={destinations.some((move) => move.square === square) ? "true" : undefined}
               onKeyDown={(event) => {

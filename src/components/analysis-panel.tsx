@@ -9,6 +9,7 @@ import { PRESETS } from "@/lib/engine/domain";
 import { useAnalysis } from "@/store/analysis";
 import { ThreatPanel } from "./threat-panel";
 import { TOP_MOVE_COLORS } from "@/lib/engine/arrows";
+import { MoveStrengthIcon } from "./move-strength-icon";
 
 export function AnalysisPanel() {
   const analysis = useAnalysis();
@@ -38,7 +39,7 @@ export function AnalysisPanel() {
       {primary?.nodes !== undefined && <p className="text-xs text-muted-foreground">{primary.nodes.toLocaleString()} nodes{primary.nodesPerSecond !== undefined ? ` · ${primary.nodesPerSecond.toLocaleString()} nodes/s` : ""}{primary.timeMs !== undefined ? ` · ${primary.timeMs} ms` : ""}</p>}
     </div> : <p className="my-4 text-sm leading-relaxed text-muted-foreground">{analysis.status === "loading" ? "Loading the local engine. You can keep using the board." : analysis.status === "analyzing" ? "Analyzing this position…" : "Explore freely, analyze one position, or enable assistance after each move. The engine never moves your pieces."}</p>}
     <ThreatPanel />
-    {analysis.assessment && <p className="mt-3 text-sm" title={analysis.assessment.reason}>Last move: <strong>{analysis.assessment.label}</strong><span className="block text-xs text-muted-foreground">{analysis.assessment.reason}</span></p>}
+    {analysis.assessment && <div className="mt-3 flex items-start gap-2 text-sm" title={analysis.assessment.reason}><MoveStrengthIcon label={analysis.assessment.label} className="size-7 shrink-0" /><p>Last move: <strong>{analysis.assessment.label}</strong><span className="block text-xs text-muted-foreground">{analysis.assessment.reason}</span></p></div>}
     {analysis.error && <p role="alert" className="my-3 text-sm text-destructive">{analysis.error}</p>}
     {analysis.storageError && <p role="alert" className="my-3 text-xs text-amber-200">{analysis.storageError}</p>}
     <div className="mt-4 flex flex-wrap gap-2">
