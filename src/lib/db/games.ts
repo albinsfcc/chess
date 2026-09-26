@@ -4,6 +4,7 @@ import type { GameIdentity } from "@/lib/pgn/hash";
 import { profileSchema, type PlatformProfile } from "@/lib/platforms/domain";
 import type { SavedAnalysis } from "@/lib/engine/repository";
 import type { GameAnalysis, PositionAnalysis } from "@/lib/game-analysis/domain";
+import type { ComputerPosition } from "@/lib/game-analysis/computer-progress";
 
 export class GamesDatabase extends Dexie {
   games!: Table<GameRecord, string>;
@@ -12,6 +13,7 @@ export class GamesDatabase extends Dexie {
   analyses!: Table<SavedAnalysis, string>;
   gameAnalyses!: Table<GameAnalysis, string>;
   positionAnalyses!: Table<PositionAnalysis, string>;
+  computerPositions!: Table<ComputerPosition, string>;
   constructor(name = "chess-review") {
     super(name);
     this.version(1).stores({
@@ -24,6 +26,7 @@ export class GamesDatabase extends Dexie {
     this.version(5).stores({ games: "id,&[source+normalizedPgnHash],&[source+externalId],importedAt,playedAt,[libraryDate+importedAt+id]" }).upgrade(async (transaction) => {
       await transaction.table("games").toCollection().modify((game: GameRecord & { libraryDate?: string }) => { game.libraryDate = game.playedAt ?? ""; });
     });
+    this.version(6).stores({ computerPositions: "id,gameId,[gameId+ply],createdAt" });
   }
 }
 
@@ -93,11 +96,12 @@ export class GamesRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.transaction("rw", [this.db.games, this.db.trees, this.db.gameAnalyses, this.db.positionAnalyses], async () => {
+    await this.db.transaction("rw", [this.db.games, this.db.trees, this.db.gameAnalyses, this.db.positionAnalyses, this.db.computerPositions], async () => {
       await this.db.games.delete(id);
       await this.db.trees.delete(id);
       await this.db.gameAnalyses.where("gameId").equals(id).delete();
       await this.db.positionAnalyses.where("gameId").equals(id).delete();
+      await this.db.computerPositions.where("gameId").equals(id).delete();
     });
   }
 }

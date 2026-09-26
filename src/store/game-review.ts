@@ -4,17 +4,23 @@ import { useWorkspace } from "./workspace";
 import { useAnalysis } from "./analysis";
 import { fullReview } from "@/lib/game-analysis/review-summary";
 import { usableResult } from "@/lib/engine/result-quality";
+import { configSchema } from "@/lib/engine/domain";
 
-type ReviewDialogState = { open: boolean; gameId: string | null; automaticGameId: string | null; pendingGameId: string | null; preparing: boolean; opening: () => Promise<void>; close: () => void; retry: () => Promise<void>; autoResume: () => void };
+type ReviewDialogState = { open: boolean; gameId: string | null; automaticGameId: string | null; pendingGameId: string | null; preparing: boolean; opening: (prepare?: () => Promise<void>) => Promise<void>; close: () => void; retry: () => Promise<void>; autoResume: () => void };
 let generation = 0, resuming = false;
 export const useReviewDialog = create<ReviewDialogState>((set, get) => ({
   open: false, gameId: null, automaticGameId: null, pendingGameId: null, preparing: false,
-  opening: async () => {
+  opening: async (prepare) => {
     const document = useWorkspace.getState().imported;
     if (!document?.tree.playable || get().preparing || useGameAnalysis.getState().busy) return;
     const token = ++generation, current = () => token === generation && get().open && useWorkspace.getState().imported?.game.id === document.game.id;
-    const { preset, multiPv } = useAnalysis.getState().preferences;
+    const stored = document.game.source === "computer" ? configSchema.safeParse({ preset: document.game.headers.ReviewPreset, multiPv: Number(document.game.headers.ReviewMultiPV) }) : null;
+    const { preset, multiPv } = stored?.success ? stored.data : useAnalysis.getState().preferences;
     set({ open: true, gameId: document.game.id, preparing: true });
+    if (prepare) {
+      try { await prepare(); } catch (error) { useGameAnalysis.setState({ error: error instanceof Error ? error.message : "Saved progress could not be loaded." }); set({ preparing: false }); return; }
+      if (!current()) return;
+    }
     await useGameAnalysis.getState().load(document.game.id);
     if (!current()) return;
     const review = useGameAnalysis.getState();

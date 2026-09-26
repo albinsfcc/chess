@@ -5,12 +5,16 @@ export const preferencesSchema = z.object({
   lightSquare: z.string().regex(/^#[0-9a-f]{6}$/i),
   darkSquare: z.string().regex(/^#[0-9a-f]{6}$/i),
   showCoordinates: z.boolean(),
+  boardTexture: z.enum(["plain", "wooden"]).default("plain"),
+  pieceSet: z.enum(["classic", "carved"]).default("classic"),
 });
 export type BoardPreferences = z.infer<typeof preferencesSchema>;
 export const defaultPreferences: BoardPreferences = {
   lightSquare: "#dee5e7",
   darkSquare: "#657e8b",
   showCoordinates: true,
+  boardTexture: "plain",
+  pieceSet: "classic",
 };
 
 export function parsePreferences(value: string | null): BoardPreferences {

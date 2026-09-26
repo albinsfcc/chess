@@ -1,4 +1,5 @@
 "use client";
+import { visibleLines } from "@/lib/engine/alternatives";
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ export function GameAnalysisPanel() {
           <div className="flex justify-between gap-2"><strong className="font-mono text-xl text-primary">{current.scoreBefore ? formatScore(current.scoreBefore) : "No score"}</strong><span className="text-xs text-muted-foreground">Depth {current.depth ?? "—"}</span></div>
           <p className="text-sm">Best move: <strong className="font-mono">{current.bestMoveSan ?? "No legal move"}</strong></p>
           {current.playedMoveSan && <p className="text-xs text-muted-foreground">Next recorded move: {current.playedMoveSan}</p>}
-          <ol aria-label="Saved principal variations" className="space-y-2">{current.result.lines.slice(0, topMoves).map((line) => <li key={line.multiPv} className="rounded-md border p-3 text-sm"><div className="flex justify-between"><span className="font-mono text-primary">#{line.multiPv} · {line.lowerBound ? "≥ " : line.upperBound ? "≤ " : ""}{formatScore(line.score)}</span><span className="text-xs">Depth {line.depth}</span></div><p className="mt-2 break-words font-mono">{line.pvSan.join(" ") || "No continuation"}</p></li>)}</ol>
+          <ol aria-label="Saved principal variations" className="space-y-2">{visibleLines(current.result, topMoves).map((line) => <li key={line.multiPv} className="rounded-md border p-3 text-sm"><div className="flex justify-between"><span className="font-mono text-primary">#{line.multiPv} · {line.lowerBound ? "≥ " : line.upperBound ? "≤ " : ""}{formatScore(line.score)}</span><span className="text-xs">Depth {line.depth}</span></div><p className="mt-2 break-words font-mono">{line.pvSan.join(" ") || "No continuation"}</p></li>)}</ol>
           <p className="text-xs text-muted-foreground">{current.nodes?.toLocaleString() ?? "—"} nodes · {current.elapsedMs ?? "—"} ms</p>
         </> : <p className="text-sm text-muted-foreground">This position is not analyzed in the selected session. Select a graph point or Resume to finish missing positions.</p>}
         {played && <div className="space-y-2 rounded-md border p-3 text-sm" aria-label="Played move evaluation"><p>Played move: <strong>{played.playedMoveSan}</strong></p><p>Before: {played.scoreBefore ? formatScore(played.scoreBefore) : "Pending"} · After: {played.scoreAfter ? formatScore(played.scoreAfter) : "Pending"}</p><p>{changeDescription(played.evaluationChange)}</p><p className="text-xs text-muted-foreground">Best alternative before this move: {played.bestMoveSan ?? "None"}</p></div>}

@@ -9,6 +9,7 @@ export interface EngineWorker {
 }
 const abortError = () => new DOMException("Analysis cancelled", "AbortError");
 export class EngineClient {
+  options: import("./domain").UciOption[] = [];
   private worker: EngineWorker | null = null;
   private generation = 0;
   private counter = 0;
@@ -51,6 +52,7 @@ export class EngineClient {
   private receive(event: WorkerEvent) {
     if (event.type === "ready") {
       this.version = event.engineVersion;
+      this.options = event.options ?? [];
       if (this.boot) { clearTimeout(this.boot.timer); this.boot.resolve(this.version); this.boot = null; }
       this.emit(event); this.emit({ type: "status", status: "ready" });
     } else if (event.type === "error") {
@@ -63,7 +65,7 @@ export class EngineClient {
       } else this.emit(event);
     }
   }
-  async analyze(fen: string, config: AnalysisConfig, owner?: string): Promise<EngineResult> {
+  async analyze(fen: string, config: AnalysisConfig, owner?: string, bot?: import("./domain").BotSearch): Promise<EngineResult> {
     this.checkOwner(owner);
     configSchema.parse(config);
     this.stop(owner); const serial = this.counter;
@@ -73,7 +75,7 @@ export class EngineClient {
     return new Promise<EngineResult>((resolve, reject) => {
       this.active = { id, fen, resolve, reject, timer: setTimeout(() => this.fail("Stockfish search timed out. Restart to continue."), PRESETS[config.preset] + 7000) };
       this.emit({ type: "status", status: "analyzing" });
-      this.send({ type: "search", request: { requestId: id, fen, config } });
+      this.send({ type: "search", request: { requestId: id, fen, config, ...(bot ? { bot } : {}) } });
     });
   }
   stop(owner?: string) {

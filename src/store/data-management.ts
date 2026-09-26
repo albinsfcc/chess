@@ -17,6 +17,7 @@ import { platformStores } from "./platform-import";
 type DataState = { busy: boolean; error: string | null; success: string | null; preview: LocalBackup | null;
   validate: (file: File) => Promise<void>; export: () => Promise<void>; restore: () => Promise<void>; clear: (all: boolean) => Promise<void> };
 async function idle() {
+  if (useWorkspace.getState().computer) throw new Error("Finish or exit the computer game before managing local data.");
   if (Object.values(platformStores).some((store) => store.getState().busy)) throw new Error("Finish or cancel the active platform import before managing local data.");
   await useGameAnalysis.getState().pause(); useAnalysis.getState().stop(); engineClient().terminate(); invalidateAnalysisWrites();
 }

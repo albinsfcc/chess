@@ -30,6 +30,7 @@ async function assessLastMove(result: EngineResult, token: number) {
   } catch { /* Missing adjacent data leaves this move ungraded. */ }
 }
 function refreshThreats() {
+  if (useWorkspace.getState().computer) { void useThreats.getState().update(null); return; }
   try { void useThreats.getState().update(useAnalysis.getState().preferences.showThreats ? currentPosition() : null); }
   catch { void useThreats.getState().update(null); }
 }
@@ -94,6 +95,7 @@ export const useAnalysis = create<AnalysisState>((set, get) => ({
     catch (error) { if (token === serial) set({ status: "error", error: error instanceof Error ? error.message : "Engine restart failed." }); }
   },
   positionChanged: (newGame = false) => {
+    if (useWorkspace.getState().computer) return;
     refreshThreats();
     serial++; const client = engineClient(); if (newGame) client.newGame(); else client.stop();
     set({ result: null, fen: null, cached: false, error: null, status: "stopped", assessment: null });

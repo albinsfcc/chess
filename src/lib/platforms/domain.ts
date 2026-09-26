@@ -3,7 +3,7 @@ import type { GameDocument } from "@/lib/pgn/domain";
 
 export const platformSchema = z.enum(["chesscom", "lichess"]);
 export type Platform = z.infer<typeof platformSchema>;
-export const platformName: Record<Platform | "pgn", string> = { chesscom: "Chess.com", lichess: "Lichess", pgn: "PGN" };
+export const platformName: Record<Platform | "pgn" | "computer", string> = { chesscom: "Chess.com", lichess: "Lichess", pgn: "PGN", computer: "Computer" };
 // Accept legacy usernames, but never path separators, URL syntax or whitespace.
 export const usernameSchema = z.string().trim().min(2).max(30).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/);
 export const profileSummarySchema = z.object({

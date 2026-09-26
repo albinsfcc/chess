@@ -9,6 +9,9 @@ test.beforeEach(async ({ page }) => {
 
 test("PGN validates automatically and a single import opens review", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("button", { name: "Play Computer", exact: true })).toBeVisible();
+  await expect(page.getByTestId("library-count")).toHaveText("0");
+  await expect(page.getByRole("button", { name: "Game library", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Paste PGN", exact: true }).click();
   await page.getByLabel("PGN games", { exact: true }).fill(platformPgn);
   await expect(page.getByRole("button", { name: "Validate", exact: true })).toHaveCount(0);
@@ -16,9 +19,17 @@ test("PGN validates automatically and a single import opens review", async ({ pa
   await expect(page.getByRole("heading", { name: "Reviewing game" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Review game", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Close and pause" }).click();
+  await expect(page.getByTestId("library-count")).toHaveText("1");
   await page.getByRole("button", { name: "Game library", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Saved games", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Open Alice vs Bob", exact: true }).click();
   await expect(page.getByRole("button", { name: "Review game", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Game library", exact: true }).click();
+  await page.getByRole("dialog", { name: "Saved games", exact: true }).getByRole("button", { name: "Delete Alice vs Bob", exact: true }).click();
+  await page.getByRole("button", { name: "Delete game", exact: true }).click();
+  await expect(page.getByTestId("library-count")).toHaveText("0");
+  await page.getByRole("dialog", { name: "Saved games", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Game library", exact: true })).toBeDisabled();
 });
 
 for (const platform of ["Chess.com", "Lichess"]) {

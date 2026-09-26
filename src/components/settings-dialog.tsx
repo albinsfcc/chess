@@ -1,5 +1,7 @@
 "use client";
 
+import { usePieceSet } from "./piece-set";
+import { squareAppearance, WOODEN_COLORS, WOOD_GRAIN } from "@/lib/board-appearance";
 import { Settings2 } from "lucide-react";
 import { useSound } from "@/store/sound";
 import dynamic from "next/dynamic";
@@ -15,9 +17,11 @@ const DataSettings = dynamic(() => import("@/components/data-settings").then((mo
 export function SettingsDialog() {
   const sound = useSound();
   const preferences = useWorkspace((state) => state.preferences);
+  const previewPieces = usePieceSet(preferences.pieceSet);
   const update = useWorkspace((state) => state.updatePreferences);
   const storageError = useWorkspace((state) => state.storageError);
   const boardPresets = [
+    { name: "Wooden", ...WOODEN_COLORS },
     { name: "Classic Green", lightSquare: "#EEEED2", darkSquare: "#769656" },
     { name: "Walnut", lightSquare: "#F0D9B5", darkSquare: "#B58863" },
     { name: "Ocean", lightSquare: "#DEE3E6", darkSquare: "#788A94" },
@@ -45,6 +49,11 @@ export function SettingsDialog() {
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Make this board your own. Changes apply immediately.</DialogDescription>
         </DialogHeader>
+        <div className="space-y-3" aria-label="Board and pieces preview">
+          <div className="grid grid-cols-6 overflow-hidden rounded-lg border">{["bK", "bQ", "bR", "bB", "bN", "bP", "wK", "wQ", "wR", "wB", "wN", "wP"].map((code, index) => { const Piece = previewPieces[code]; return <div key={code} className="aspect-square" style={squareAppearance(preferences, (index + Math.floor(index / 6)) % 2 === 0)}><Piece /></div>; })}</div>
+          <p className="text-xs text-muted-foreground">Live preview ? changes apply to the board immediately.</p>
+        </div>
+        <fieldset className="space-y-2"><legend className="text-sm font-medium">Pieces</legend><div className="flex gap-2">{(["classic", "carved"] as const).map(pieceSet => <Button key={pieceSet} variant="outline" aria-pressed={preferences.pieceSet === pieceSet} onClick={() => update({ pieceSet })}>{pieceSet === "classic" ? "Classic" : "Carved"}</Button>)}</div><p className="text-xs text-muted-foreground">Carved: original Chess Review SVG artwork, <a className="underline" href="/pieces/carved/LICENSE.txt" target="_blank" rel="noreferrer">MIT licensed</a>.</p></fieldset>
         <div className="space-y-5 py-3">
           {([
             ["lightSquare", "Light squares"],
@@ -54,7 +63,7 @@ export function SettingsDialog() {
               <label htmlFor={key} className="text-sm font-medium">{label}</label>
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm text-muted-foreground">{preferences[key].toUpperCase()}</span>
-                <input id={key} type="color" value={preferences[key]} onChange={(event) => update({ [key]: event.target.value })} className="h-10 w-12 cursor-pointer rounded-md border bg-transparent p-1" />
+                <input id={key} type="color" value={preferences[key]} onChange={(event) => update({ [key]: event.target.value, boardTexture: "plain" })} className="h-10 w-12 cursor-pointer rounded-md border bg-transparent p-1" />
               </div>
             </div>
           ))}
@@ -65,7 +74,7 @@ export function SettingsDialog() {
               {boardPresets.map(({ name, lightSquare, darkSquare }) => {
                 const selected =
                   preferences.lightSquare.toLowerCase() === lightSquare.toLowerCase() &&
-                  preferences.darkSquare.toLowerCase() === darkSquare.toLowerCase();
+                  preferences.darkSquare.toLowerCase() === darkSquare.toLowerCase() && preferences.boardTexture === (name === "Wooden" ? "wooden" : "plain");
 
                 return (
                   <Button
@@ -73,7 +82,7 @@ export function SettingsDialog() {
                     type="button"
                     variant="outline"
                     aria-pressed={selected}
-                    onClick={() => update({ lightSquare, darkSquare })}
+                    onClick={() => update({ lightSquare, darkSquare, boardTexture: name === "Wooden" ? "wooden" : "plain" })}
                     className={`h-auto justify-start gap-3 whitespace-normal p-3 ${
                       selected ? "border-primary ring-1 ring-primary" : ""
                     }`}
@@ -84,7 +93,7 @@ export function SettingsDialog() {
                     >
                       {[lightSquare, darkSquare, darkSquare, lightSquare].map(
                         (color, index) => (
-                          <span key={index} style={{ backgroundColor: color }} />
+                          <span key={index} style={{ backgroundColor: color, ...(name === "Wooden" ? { backgroundImage: WOOD_GRAIN } : {}) }} />
                         )
                       )}
                     </span>

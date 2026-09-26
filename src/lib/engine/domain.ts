@@ -29,11 +29,14 @@ export const resultSchema = z.object({
 });
 export type EngineResult = z.infer<typeof resultSchema>;
 export type EngineStatus = "loading" | "ready" | "analyzing" | "stopped" | "error";
-export const searchSchema = z.object({ requestId: z.string().min(1), fen: z.string().max(200), config: configSchema });
+export const botSearchSchema = z.object({ timeMs: z.number().int().min(20).max(2000), depth: z.number().int().min(1).max(30).optional(), elo: z.number().int().positive().optional() });
+export type BotSearch = z.infer<typeof botSearchSchema>;
+export type UciOption = { name: string; type: string; min?: number; max?: number };
+export const searchSchema = z.object({ requestId: z.string().min(1), fen: z.string().max(200), config: configSchema, bot: botSearchSchema.optional() });
 export type SearchRequest = z.infer<typeof searchSchema>;
 export type WorkerCommand = { type: "initialize" } | { type: "search"; request: SearchRequest } | { type: "stop" } | { type: "new-game" };
 export type WorkerEvent =
-  | { type: "ready"; engineVersion: string }
+  | { type: "ready"; engineVersion: string; options?: UciOption[] }
   | { type: "result"; result: EngineResult; complete: boolean }
   | { type: "error"; message: string; requestId?: string };
 export type EngineEvent = WorkerEvent | { type: "status"; status: EngineStatus };

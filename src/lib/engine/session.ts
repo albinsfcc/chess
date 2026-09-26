@@ -6,6 +6,7 @@ import { withTerminalScore } from "./result-quality";
 /** UCI state machine, executed only in the worker. Drains bestmove + readyok
  * before changing positions: UCI output itself has no request identifiers. */
 export class UciSession {
+  private options = new Map<string, import("./domain").UciOption>();
   private initialized = false;
   private ready = false;
   private barrier = false;
@@ -44,22 +45,28 @@ export class UciSession {
     const request = this.pending; if (!request) return;
     this.pending = null;
     this.active = { request, lines: new Map(), exact: new Map(), cancelled: false };
+    const limit = this.options.get("UCI_LimitStrength"), elo = this.options.get("UCI_Elo"), skill = this.options.get("Skill Level");
+    const limited = !!(request.bot?.elo && limit && elo);
+    if (limit) this.send(`setoption name UCI_LimitStrength value ${limited}`);
+    if (limited) this.send(`setoption name UCI_Elo value ${Math.max(elo!.min ?? 0, Math.min(elo!.max ?? 4000, request.bot!.elo!))}`);
+    if (skill) this.send(`setoption name Skill Level value ${skill.max ?? 20}`);
     this.send(`setoption name MultiPV value ${request.config.multiPv}`);
     this.send(`position fen ${request.fen}`);
-    this.send(`go movetime ${PRESETS[request.config.preset]}`);
+    this.send(`go movetime ${request.bot?.timeMs ?? PRESETS[request.config.preset]}${request.bot?.depth ? ` depth ${request.bot.depth}` : ""}`);
   }
   receive(raw: string) {
     if (this.failed) return;
     for (const text of raw.split(/\r?\n/)) {
       const event = parseUci(text); if (!event) continue;
-      if (event.type === "name") this.version = event.name;
+      if (event.type === "option") this.options.set(event.option.name, event.option);
+      else if (event.type === "name") this.version = event.name;
       else if (event.type === "uciok") {
         if (this.ready || this.barrier) continue;
         this.barrier = true; this.send("isready");
       } else if (event.type === "readyok") {
         if (!this.barrier) continue;
         this.barrier = false;
-        if (!this.ready) { this.ready = true; this.send("setoption name MultiPV value 3"); this.emit({ type: "ready", engineVersion: this.version }); }
+        if (!this.ready) { this.ready = true; this.send("setoption name MultiPV value 3"); this.emit({ type: "ready", engineVersion: this.version, ...(this.options.size ? { options: [...this.options.values()] } : {}) }); }
         this.advance();
       } else if (event.type === "info") {
         if (!this.active || this.active.cancelled || event.multiPv > this.active.request.config.multiPv) continue;

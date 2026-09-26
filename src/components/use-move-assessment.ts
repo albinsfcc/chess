@@ -7,8 +7,10 @@ import { useOpenings } from "@/store/openings";
 import { chessAt } from "@/lib/game";
 import { bookContinuation } from "@/lib/openings";
 import { intrinsicAssessment } from "@/lib/game-analysis/move-quality";
+import { useComputer } from "@/store/computer";
 
 export function useMoveAssessment(fen: string) {
+  const computer = useComputer();
   const gameId = useWorkspace((state) => state.imported?.game.id), path = useWorkspace((state) => state.selectedPath);
   const playable = useWorkspace((state) => state.imported?.tree.playable !== false);
   const records = useGameAnalysis((state) => state.positions);
@@ -21,5 +23,6 @@ export function useMoveAssessment(fen: string) {
     const before = chessAt({ ...game, cursor: game.cursor - 1 }), move = game.moves[game.cursor - 1], uci = `${move.from}${move.to}${move.promotion ?? ""}`;
     return intrinsicAssessment(before.fen(), uci, index ? bookContinuation(before.fen(), uci, index)?.name : undefined);
   }, [game, index, playable]);
+  if (computer.active) return computer.showFeedback && computer.feedbackPly === game.cursor ? computer.feedback[game.cursor]?.assessment ?? null : null;
   return playable ? intrinsic ?? (liveFen === fen && resultFen === fen ? live : null) ?? saved : null;
 }

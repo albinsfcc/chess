@@ -10,7 +10,7 @@ import { gameAnalysisSchema, positionAnalysisSchema } from "@/lib/game-analysis/
 
 export class BackupRepository {
   constructor(private readonly db: GamesDatabase = gamesDatabase()) {}
-  private tables() { return [this.db.games, this.db.trees, this.db.profiles, this.db.analyses, this.db.gameAnalyses, this.db.positionAnalyses]; }
+  private tables() { return [this.db.games, this.db.trees, this.db.profiles, this.db.analyses, this.db.gameAnalyses, this.db.positionAnalyses, this.db.computerPositions]; }
   async export(preferences?: LocalBackup["preferences"]): Promise<string> {
     const snapshot = await this.db.transaction("r", this.tables(), async () => {
       const backup: LocalBackup = { format: "chess-review-backup", version: BACKUP_VERSION, appVersion: APP_VERSION, createdAt: new Date().toISOString(), documents: [], profiles: [], sessions: [], positions: [], cache: [], ...(preferences ? { preferences } : {}) };
@@ -66,6 +66,7 @@ export class BackupRepository {
   async clearAnalysis() {
     await this.db.transaction("rw", this.tables(), async () => {
       await this.db.analyses.clear(); await this.db.gameAnalyses.clear(); await this.db.positionAnalyses.clear();
+      await this.db.computerPositions.clear();
       await this.db.games.toCollection().modify((game) => { if (game.analysisStatus !== "unsupported") game.analysisStatus = "not-analyzed"; });
     });
   }

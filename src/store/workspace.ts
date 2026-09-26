@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createGame, navigateTo, tryMove, type GameState, type MoveResult, type PromotionPiece } from "@/lib/game";
+import { chessAt, createGame, navigateTo, tryMove, type GameState, type MoveResult, type PromotionPiece } from "@/lib/game";
 import { defaultPreferences, parsePreferences, PREFERENCES_KEY, preferencesSchema, type BoardPreferences } from "@/lib/preferences";
 import type { GameDocument, NodePath } from "@/lib/pgn/domain";
 import { reconstructPosition } from "@/lib/pgn/position";
@@ -13,6 +13,7 @@ export function variationsSaved() { return pendingSave; }
 type WorkspaceState = {
   boardTransition: "replace" | "navigate" | "move";
   boardEpoch: number;
+  computer: { human: "w" | "b"; locked: boolean } | null;
   game: GameState;
   imported: GameDocument | null;
   freeGame: GameState | null;
@@ -33,18 +34,19 @@ type WorkspaceState = {
 };
 
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
-  boardTransition: "replace", boardEpoch: 0,
+  boardTransition: "replace", boardEpoch: 0, computer: null,
   game: createGame(),
   imported: null,
   freeGame: null,
   selectedPath: [],
   navigationPaths: [],
   openGame: (document) => {
+    if (get().computer) return;
     const position = reconstructPosition(document.tree);
     set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, imported: document, freeGame: get().imported ? get().freeGame : get().game,
       game: position.game, selectedPath: [], navigationPaths: position.navigationPaths });
   },
-  closeGame: () => set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, imported: null, game: get().freeGame ?? createGame(), freeGame: null, selectedPath: [], navigationPaths: [] }),
+  closeGame: () => { if (get().computer) return; set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, imported: null, game: get().freeGame ?? createGame(), freeGame: null, selectedPath: [], navigationPaths: [] }); },
   selectNode: (path) => {
     const document = get().imported;
     if (!document) return;
@@ -58,6 +60,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   preferences: { ...defaultPreferences },
   storageError: null,
   move: (from, to, promotion) => {
+    const computer = get().computer;
+    if (computer && (computer.locked || chessAt(get().game).turn() !== computer.human)) return { kind: "illegal" };
     if (get().imported && !get().imported!.tree.playable) return { kind: "illegal" };
     const result = tryMove(get().game, from, to, promotion, !!get().imported);
     if (result.kind === "moved") {
@@ -77,11 +81,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     return result;
   },
   goTo: (ply) => {
+    if (get().computer) return;
     const next = navigateTo(get().game, ply);
     if (get().imported) set({ boardTransition: "navigate", game: next, selectedPath: next.cursor ? get().navigationPaths[next.cursor - 1] : [] });
     else set({ boardTransition: "navigate", game: next });
   },
-  reset: () => set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, game: createGame(), imported: null, freeGame: null, selectedPath: [], navigationPaths: [] }),
+  reset: () => { if (get().computer) return; set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, game: createGame(), imported: null, freeGame: null, selectedPath: [], navigationPaths: [] }); },
   flip: () => set({ orientation: get().orientation === "white" ? "black" : "white" }),
   hydratePreferences: () => {
     try {

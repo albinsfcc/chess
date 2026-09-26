@@ -1,4 +1,9 @@
 "use client";
+import { usePieceSet } from "./piece-set";
+import { squareAppearance } from "@/lib/board-appearance";
+import { changeDescription } from "@/lib/game-analysis/evaluation";
+import { useComputer } from "@/store/computer";
+import { attackedHumanPieces } from "@/lib/computer";
 import { topMoveArrows, THREAT_COLOR } from "@/lib/engine/arrows";
 import { useThreats } from "@/store/threats";
 
@@ -31,9 +36,11 @@ const promotions: { piece: PromotionPiece; name: string; white: string; black: s
 export function GameBoard() {
   const game = useWorkspace((state) => state.game);
   const exploring = useWorkspace((state) => state.imported !== null);
-  const readOnly = useWorkspace((state) => state.imported?.tree.playable === false);
+  const session = useComputer();
+  const readOnly = useWorkspace((state) => state.imported?.tree.playable === false || !!state.computer && (state.computer.locked || chessAt(state.game).turn() !== state.computer.human));
   const orientation = useWorkspace((state) => state.orientation);
   const preferences = useWorkspace((state) => state.preferences);
+  const pieces = usePieceSet(preferences.pieceSet);
   const makeMove = useWorkspace((state) => state.move);
   const chess = useMemo(() => chessAt(game), [game]);
   const gameOver = chess.isCheckmate() || chess.isStalemate() || (!exploring && chess.isGameOver());
@@ -42,13 +49,14 @@ export function GameBoard() {
   const transition = useWorkspace((state) => state.boardTransition), epoch = useWorkspace((state) => state.boardEpoch);
   const mode = useAnalysis((state) => state.preferences.automatic);
   const animation = useBoardAnimation(chess.fen(), transition);
-  const showArrow = useAnalysis((state) => state.preferences.showArrow);
+  const preferenceArrow = useAnalysis((state) => state.preferences.showArrow);
+  const showArrow = session.active ? session.assisted : preferenceArrow;
   const count = useAnalysis((state) => state.preferences.multiPv), showThreats = useAnalysis((state) => state.preferences.showThreats);
   const threatResult = useThreats((state) => state.result);
   const arrows = useMemo(() => [
     ...(showArrow ? topMoveArrows(chess.fen(), result, count) : []),
-    ...(showThreats && threatResult?.fen === chess.fen() ? threatResult.threats.map((threat) => ({ startSquare: threat.from, endSquare: threat.to, color: THREAT_COLOR })) : []),
-  ], [showArrow, chess, result, count, showThreats, threatResult]);
+    ...(!session.active && showThreats && threatResult?.fen === chess.fen() ? threatResult.threats.map((threat) => ({ startSquare: threat.from, endSquare: threat.to, color: THREAT_COLOR })) : []),
+  ], [showArrow, chess, result, count, showThreats, threatResult, session.active]);
   const bestMove = showArrow && result?.fen === chess.fen() ? result.bestMove : null;
   const [selection, setSelection] = useState<{ square: Square; game: GameState; epoch: number; mode: boolean } | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square; game: GameState } | null>(null);
@@ -86,6 +94,8 @@ export function GameBoard() {
       };
     }
   }
+  const attacked = session.active && session.assisted && !readOnly && !animation.settling ? attackedHumanPieces(chess, session.human) : [];
+  for (const square of attacked) squareStyles[square] = { ...squareStyles[square], boxShadow: "inset 0 0 0 4px #f59e0b" };
   if (king) squareStyles[king] = { ...squareStyles[king], backgroundImage: "radial-gradient(ellipse, #ed4b5c 5%, #ed4b5ca0 55%, transparent 80%)" };
 
   function attempt(from: string, to: string, dragged = false): boolean {
@@ -127,14 +137,15 @@ export function GameBoard() {
   return (
     <>
       <div className="board-with-evaluation">
-      <div className="board-frame relative overflow-hidden rounded-md border border-white/10" data-testid="chessboard" data-orientation={orientation} data-best-move={bestMove ?? undefined} data-arrow-count={arrows.length} data-threat-count={showThreats && threatResult?.fen === chess.fen() ? threatResult.threats.length : 0}>
+      <div className="board-frame relative overflow-hidden rounded-md border border-white/10" data-testid="chessboard" data-input-locked={readOnly} data-attacked-count={attacked.length} data-orientation={orientation} data-best-move={bestMove ?? undefined} data-arrow-count={arrows.length} data-threat-count={showThreats && threatResult?.fen === chess.fen() ? threatResult.threats.length : 0}>
         <Chessboard options={{
           id: "workspace-board",
+          pieces,
           position: animation.fen,
           boardOrientation: orientation,
           showNotation: preferences.showCoordinates,
-          lightSquareStyle: { backgroundColor: preferences.lightSquare },
-          darkSquareStyle: { backgroundColor: preferences.darkSquare },
+          lightSquareStyle: squareAppearance(preferences, true),
+          darkSquareStyle: squareAppearance(preferences, false),
           lightSquareNotationStyle: { color: coordinateColor(preferences.lightSquare), fontSize: "clamp(11px, 1.8vw, 14px)", fontWeight: 700 },
           darkSquareNotationStyle: { color: coordinateColor(preferences.darkSquare), fontSize: "clamp(11px, 1.8vw, 14px)", fontWeight: 700 },
           squareStyles,
@@ -179,6 +190,7 @@ export function GameBoard() {
               data-testid={`square-${square}`}
               data-last-move={lastMove?.from === square || lastMove?.to === square ? "true" : undefined}
               data-move-strength={lastMove && (lastMove.from === square || lastMove.to === square) ? assessment?.label : undefined}
+              data-attacked={attacked.includes(square as Square) || undefined}
               data-check={king === square ? "true" : undefined}
               data-legal-destination={destinations.some((move) => move.square === square) ? "true" : undefined}
               onKeyDown={(event) => {
@@ -200,6 +212,7 @@ export function GameBoard() {
       </div>
       <EvaluationBar fen={chess.fen()} />
       </div>
+      {session.active && session.showFeedback && session.feedbackPly === game.cursor && session.feedback[game.cursor] && <p role="status" data-testid="human-feedback-summary" className="mt-2 rounded-lg border bg-card px-3 py-2 text-sm"><strong>{session.feedback[game.cursor].assessment.label}</strong> · {changeDescription(session.feedback[game.cursor].change)} <span className="text-muted-foreground">Best move: {session.feedback[game.cursor].bestMove ?? "none"}.</span></p>}
       <p data-board-chrome aria-live="polite" className={`board-instructions mt-2 min-h-5 text-center text-xs ${notice ? "text-amber-200" : "text-muted-foreground"}`}>
         {readOnly ? "Use the move list or navigation controls to explore this game." : notice || (selected ? `Choose a square for ${selected}, or select another piece.` : "Drag or click to move. Arrows navigate moves. Alt+arrows explore squares; Enter selects a piece or destination.")}
       </p>

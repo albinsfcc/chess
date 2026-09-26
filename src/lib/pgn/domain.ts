@@ -30,7 +30,7 @@ export const treeSchema = z.object({
 export type GameTree = z.infer<typeof treeSchema>;
 
 export const gameSchema = z.object({
-  id: z.string().uuid(), source: z.enum(["pgn", "chesscom", "lichess"]), externalId: z.string().optional(),
+  id: z.string().uuid(), source: z.enum(["pgn", "chesscom", "lichess", "computer"]), externalId: z.string().optional(),
   externalUrl: z.string().url().optional(), rated: z.boolean().optional(), timeCategory: z.string().optional(),
   rawPgn: z.string().min(1), normalizedPgnHash: z.string().regex(/^[a-f0-9]{64}$/),
   event: z.string(), site: z.string(), playedAt: z.string().nullable(), round: z.string(),
