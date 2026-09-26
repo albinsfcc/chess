@@ -45,7 +45,7 @@ export function ComputerGame() {
     {session.active && <div className="flex flex-wrap items-center gap-2" aria-label="Computer game controls">
       <span className="text-sm">{session.bot.name} · {session.bot.level} · You play {session.human === "w" ? "White" : "Black"}</span>
       <AssistedToggle compact checked={session.assisted} disabled={!!session.result} onChange={session.setAssisted} />
-      <span role="status" data-testid="computer-status">{session.result ? `Result: ${session.result}` : session.error ? "Game paused" : session.thinking ? "Bot is thinking…" : "Your turn"}</span>
+      <span role="status" data-testid="computer-status">{session.result ? `Result: ${session.result}` : session.error ? "Game paused" : session.reviewingMove ? (session.feedbackPly !== null ? "Move feedback" : "Reviewing your move…") : session.thinking ? "Bot is thinking…" : "Your turn"}</span>
       <Button variant="outline" disabled={!!session.result} onClick={session.resign}>Resign</Button>
       <Button variant="outline" onClick={() => leave("new")}>New Game</Button>
       <Button variant="ghost" onClick={() => leave("exit")}>Exit</Button>

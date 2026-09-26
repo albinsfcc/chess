@@ -44,16 +44,21 @@ export function SettingsDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="bg-card"><Settings2 size={16} /> Settings</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" style={{ scrollbarWidth: 'none', scrollbarColor: 'transparent transparent' }}>
-        <DialogHeader>
+      <DialogContent className="settings-dialog">
+        <DialogHeader className="settings-header">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Make this board your own. Changes apply immediately.</DialogDescription>
         </DialogHeader>
+        <div className="settings-body">
+        <section className="settings-panel settings-appearance" aria-labelledby="appearance-heading">
+        <h3 id="appearance-heading" className="font-medium">Board & pieces</h3>
+        <div className="settings-preview-row">
         <div className="space-y-3" aria-label="Board and pieces preview">
           <div className="grid grid-cols-6 overflow-hidden rounded-lg border">{["bK", "bQ", "bR", "bB", "bN", "bP", "wK", "wQ", "wR", "wB", "wN", "wP"].map((code, index) => { const Piece = previewPieces[code]; return <div key={code} className="aspect-square" style={squareAppearance(preferences, (index + Math.floor(index / 6)) % 2 === 0)}><Piece /></div>; })}</div>
-          <p className="text-xs text-muted-foreground">Live preview ? changes apply to the board immediately.</p>
+          <p className="text-xs text-muted-foreground">Live preview · changes apply immediately.</p>
         </div>
         <fieldset className="space-y-2"><legend className="text-sm font-medium">Pieces</legend><div className="flex gap-2">{(["classic", "carved"] as const).map(pieceSet => <Button key={pieceSet} variant="outline" aria-pressed={preferences.pieceSet === pieceSet} onClick={() => update({ pieceSet })}>{pieceSet === "classic" ? "Classic" : "Carved"}</Button>)}</div><p className="text-xs text-muted-foreground">Carved: original Chess Review SVG artwork, <a className="underline" href="/pieces/carved/LICENSE.txt" target="_blank" rel="noreferrer">MIT licensed</a>.</p></fieldset>
+        </div>
         <div className="space-y-5 py-3">
           {([
             ["lightSquare", "Light squares"],
@@ -70,7 +75,7 @@ export function SettingsDialog() {
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">Board colour presets</legend>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="settings-presets grid grid-cols-2 gap-2">
               {boardPresets.map(({ name, lightSquare, darkSquare }) => {
                 const selected =
                   preferences.lightSquare.toLowerCase() === lightSquare.toLowerCase() &&
@@ -83,13 +88,13 @@ export function SettingsDialog() {
                     variant="outline"
                     aria-pressed={selected}
                     onClick={() => update({ lightSquare, darkSquare, boardTexture: name === "Wooden" ? "wooden" : "plain" })}
-                    className={`h-auto justify-start gap-3 whitespace-normal p-3 ${
+                    className={`h-auto justify-start gap-2 whitespace-normal p-2 ${
                       selected ? "border-primary ring-1 ring-primary" : ""
                     }`}
                   >
                     <span
                       aria-hidden="true"
-                      className="grid h-10 w-10 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded border"
+                      className="grid h-8 w-8 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded border"
                     >
                       {[lightSquare, darkSquare, darkSquare, lightSquare].map(
                         (color, index) => (
@@ -112,6 +117,8 @@ export function SettingsDialog() {
             <Switch id="coordinates" checked={preferences.showCoordinates} onCheckedChange={(showCoordinates) => update({ showCoordinates })} />
           </div>
         </div>
+        </section>
+        <section className="settings-panel space-y-5" aria-label="Analysis and sound">
         <EngineSettings />
         <section className="space-y-2 border-t pt-4" aria-label="Sound settings">
           <div className="flex items-center justify-between gap-4">
@@ -121,13 +128,17 @@ export function SettingsDialog() {
           <p className="text-xs text-muted-foreground">Moves, captures, promotion, check, checkmate, castling, invalid moves, buttons and completed game reviews.</p>
           {sound.error && <p role="alert" className="text-sm text-destructive">{sound.error}</p>}
         </section>
+        </section>
+        <div className="settings-panel settings-data space-y-5">
         <ImportSettings />
         <DataSettings />
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+        </div>
+        </div>
+        <div className="settings-footer flex flex-wrap items-center justify-between gap-3 border-t">
           <p className="text-sm text-muted-foreground">Saved on this device</p>
           <Button variant="secondary" onClick={() => update(defaultPreferences)}>Restore defaults</Button>
-        </div>
         {storageError && <p role="alert" className="text-sm text-destructive">{storageError}</p>}
+        </div>
       </DialogContent>
     </Dialog>
   );

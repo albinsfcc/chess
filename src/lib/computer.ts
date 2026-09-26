@@ -1,5 +1,7 @@
 import { Chess, type Color } from "chess.js";
 import type { BotSearch, EngineResult } from "./engine/domain";
+import { bookContinuation } from "./openings";
+import { toPlayerScore } from "./engine/normalize";
 
 export type BotProfile = { name: string; level: string; rating: number; multiPv: number; randomness: number; search: BotSearch };
 // Browser-safe budget: at most two seconds, single-thread Stockfish.
@@ -13,6 +15,28 @@ export const BOTS: readonly BotProfile[] = [
 ];
 export type Side = "white" | "random" | "black";
 export const BOT_DELAY_MIN_MS = 1000, BOT_DELAY_MAX_MS = 10000;
+export const FEEDBACK_HOLD_MS = 1000;
+export const OPENING_VARIETY_PLIES = 12, OPENING_MULTI_PV = 5;
+/** Opening variety stays within a small, strength-dependent evaluation budget. */
+export function chooseOpeningMove(chess: Chess, result: EngineResult, bot: BotProfile, random = Math.random): string | null {
+  const lines = [...result.lines].sort((a, b) => a.multiPv - b.multiPv), top = lines[0];
+  if (!top || top.lowerBound || top.upperBound) return null;
+  const best = toPlayerScore(top.score, chess.turn());
+  if (best.type !== "cp") return null; // Leave forced mates to normal engine selection.
+  const legal = new Set(chess.moves({ verbose: true }).map(move => move.lan));
+  const candidates = lines.filter(line => {
+    const score = toPlayerScore(line.score, chess.turn()), move = line.pvUci[0];
+    return !line.lowerBound && !line.upperBound && score.type === "cp" &&
+      best.value - score.value <= 25 + 50 * bot.randomness && legal.has(move) && !!bookContinuation(chess.fen(), move);
+  });
+  if (candidates.length < 2) return null;
+  const weights = candidates.map(line => {
+    const score = toPlayerScore(line.score, chess.turn());
+    return Math.exp(-Math.max(0, best.value - (score.type === "cp" ? score.value : best.value)) / (15 + 60 * bot.randomness));
+  });
+  let sample = Math.max(0, Math.min(1, random())) * weights.reduce((a, b) => a + b, 0);
+  return (candidates.find((_, i) => (sample -= weights[i]) < 0) ?? candidates[candidates.length - 1]).pvUci[0];
+}
 export function botDelayMs(random = Math.random) { return BOT_DELAY_MIN_MS + Math.floor(Math.max(0, Math.min(1, random())) * (BOT_DELAY_MAX_MS - BOT_DELAY_MIN_MS)); }
 export function cancellableDelay(ms: number) {
   let cancel!: () => void;

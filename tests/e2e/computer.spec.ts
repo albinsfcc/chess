@@ -23,6 +23,9 @@ test("computer terminal move opens the shared review with accuracy, move details
   await page.getByRole("button", { name: /Atlas Master/ }).click();
   await page.getByRole("button", { name: "Start Game", exact: true }).click();
   await page.getByTestId("square-f2").click(); await page.getByTestId("square-f3").click();
+  await expect(page.getByTestId("computer-status")).toHaveText("Move feedback");
+  expect(await page.evaluate(() => (window as unknown as { computerSearches: { bot?: unknown }[] }).computerSearches.some(row => row.bot))).toBe(false);
+  await expect(page.getByTestId("human-feedback-1")).toBeVisible();
   await expect(page.getByTestId("computer-status")).toContainText("thinking");
   await expect(page.getByTestId("chessboard")).toHaveAttribute("data-input-locked", "true");
   await expect(page.getByTestId("square-e5")).toHaveAttribute("aria-label", "e5, Black pawn");
@@ -34,10 +37,13 @@ test("computer terminal move opens the shared review with accuracy, move details
   await expect(page.getByRole("dialog").getByLabel("Black accuracy", { exact: true })).toHaveText(/\d+\.\d/);
   const searches = await page.evaluate(() => (window as unknown as { computerSearches: { fen: string; bot?: unknown }[] }).computerSearches);
   const reviewSearches = searches.filter(row => !row.bot);
-  expect(reviewSearches).toHaveLength(4); // Terminal mate is a chess fact; no search needed.
-  expect(new Set(reviewSearches.map(row => row.fen)).size).toBe(4); // No end-of-game reanalysis.
+  // A quick human move can cancel and restart an unfinished position search.
+  // Completed positions are reused; terminal mate requires no search.
+  expect(new Set(reviewSearches.map(row => row.fen)).size).toBe(4);
+  const countAtReview = searches.length;
   await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByRole("region", { name: "Game review card", exact: true })).toContainText("4 / 4 moves graded");
+  expect(await page.evaluate(() => (window as unknown as { computerSearches: unknown[] }).computerSearches.length)).toBe(countAtReview);
   await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("4");
   await expect(page.getByTestId("square-h4")).toHaveAttribute("aria-label", "h4, Black queen");
   await page.getByRole("tab", { name: "Engine", exact: true }).click();

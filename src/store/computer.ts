@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { BOTS, botDelayMs, cancellableDelay, chooseBotMove, computerResult, humanColor, type BotProfile, type Side } from "@/lib/computer";
+import { BOTS, botDelayMs, cancellableDelay, chooseBotMove, chooseOpeningMove, computerResult, FEEDBACK_HOLD_MS, OPENING_MULTI_PV, OPENING_VARIETY_PLIES, humanColor, type BotProfile, type Side } from "@/lib/computer";
 import { chessAt, createGame, tryMove, type PromotionPiece, type GameState } from "@/lib/game";
 import { engineClient } from "@/lib/engine/client";
 import { ENGINE_BUILD, type AnalysisConfig, type EngineResult } from "@/lib/engine/domain";
@@ -17,11 +17,12 @@ import { useGameAnalysis } from "./game-analysis";
 import { useReviewDialog } from "./game-review";
 import { useThreats } from "./threats";
 import { useLibrary } from "./library";
+import { useOpenings } from "./openings";
 
 export type HumanFeedback = { assessment: MoveAssessment; bestMove: string | null; change: ReturnType<typeof evaluationChange> };
 type State = {
   showFeedback: boolean; feedback: Record<number, HumanFeedback>; feedbackPly: number | null; positions: Record<number, EngineResult>; reviewConfig: AnalysisConfig;
-  active: boolean; starting: boolean; assisted: boolean; thinking: boolean; error: string | null;
+  active: boolean; starting: boolean; assisted: boolean; thinking: boolean; reviewingMove: boolean; error: string | null;
   bot: BotProfile; human: "w" | "b"; result: string | null; id: string | null;
   start: (bot: BotProfile, side: Side, assisted?: boolean, random?: () => number, showFeedback?: boolean) => Promise<void>;
   setAssisted: (enabled: boolean) => void; timeout: (loser?: "w" | "b") => void; retry: () => void; resign: () => void; exit: () => void;
@@ -46,7 +47,7 @@ async function finish(resigned?: "w" | "b", termination = "normal") {
   const result = computerResult(chess, resigned) ?? state.result;
   if (!result) return;
   cancel(); clearTimeout(feedbackTimer); const token = generation;
-  useComputer.setState({ result, thinking: false });
+  useComputer.setState({ result, thinking: false, reviewingMove: false });
   useWorkspace.setState({ computer: { human: state.human, locked: true } });
   chess.header("Event", `Computer game ${state.id}`, "Site", "Local", "Date", new Date().toISOString().slice(0, 10).replaceAll("-", "."),
     "White", state.human === "w" ? "Human" : state.bot.name, "Black", state.human === "b" ? "Human" : state.bot.name,
@@ -131,15 +132,15 @@ function schedule() {
   if (!state.active) return;
   if (state.result || computerResult(chessAt(useWorkspace.getState().game))) { void finish(); return; }
   const botTurn = chessAt(useWorkspace.getState().game).turn() !== state.human;
-  useComputer.setState({ thinking: botTurn, error: null });
+  const reviewingMove = botTurn && state.showFeedback && useWorkspace.getState().game.cursor > 0;
+  useComputer.setState({ thinking: botTurn && !reviewingMove, reviewingMove, error: null });
   useWorkspace.setState({ computer: { human: state.human, locked: botTurn } });
   const token = generation;
   if (botTurn) {
-    const delay = cancellableDelay(botDelayMs(randomMove)); cancelDelay = delay.cancel;
-    void search(token, true, delay.promise);
+    void search(token, true);
   } else timer = setTimeout(() => void search(token, false), 300);
 }
-async function search(token: number, botTurn: boolean, delay = Promise.resolve()) {
+async function search(token: number, botTurn: boolean) {
   const state = useComputer.getState();
   if (token !== generation) return;
   const game = useWorkspace.getState().game, chess = chessAt(game), fen = chess.fen();
@@ -147,24 +148,38 @@ async function search(token: number, botTurn: boolean, delay = Promise.resolve()
   try {
     const client = engineClient(); await client.ready(); if (!current()) return;
     if (botTurn) {
-      // The existing coordinator serializes bot work first, then unrestricted review work.
-      const result = await client.analyze(fen, { preset: "deep", multiPv: state.bot.multiPv }, "computer", state.bot.search);
+      if (state.showFeedback && game.cursor > 0) {
+        await collectPositions(game, token); if (!current()) return;
+        if (useComputer.getState().feedback[game.cursor]) {
+          // Republish on retry too: the full hold starts when feedback becomes visible.
+          clearTimeout(feedbackTimer);
+          useComputer.setState({ feedbackPly: game.cursor });
+          const hold = cancellableDelay(FEEDBACK_HOLD_MS); cancelDelay = hold.cancel;
+          await hold.promise; if (!current()) return;
+          feedbackTimer = setTimeout(() => useComputer.setState({ feedbackPly: null }), 4000);
+        }
+      }
+      useComputer.setState({ reviewingMove: false, thinking: true });
+      // Start the natural thinking delay and engine search together, after feedback.
+      const delay = cancellableDelay(botDelayMs(randomMove)); cancelDelay = delay.cancel;
+      const opening = game.cursor < OPENING_VARIETY_PLIES;
+      const result = await client.analyze(fen, { preset: "deep", multiPv: opening ? Math.max(OPENING_MULTI_PV, state.bot.multiPv) : state.bot.multiPv }, "computer", state.bot.search);
       if (!current()) return;
-      const move = chooseBotMove(chess, result, state.bot, randomMove);
+      const move = (opening ? chooseOpeningMove(chess, result, state.bot, randomMove) : null) ?? chooseBotMove(chess, result, state.bot, randomMove);
       await collectPositions(game, token); if (!current()) return;
-      await delay; if (!current()) return;
+      await delay.promise; if (!current()) return;
       const next = tryMove(game, move.slice(0, 2), move.slice(2, 4), move[4] as PromotionPiece | undefined);
       if (next.kind !== "moved") throw new Error("Stockfish returned an illegal move. Retry the engine.");
       // Updating the workspace advances the generation synchronously: apply exactly once.
       useWorkspace.setState({ game: next.game, boardTransition: "navigate" });
     } else { await collectPositions(game, token); if (current()) publishAssistance(); }
   } catch (error) {
-    if (current()) { cancelDelay?.(); useComputer.setState({ thinking: false, error: error instanceof Error ? error.message : "Stockfish failed. Retry to continue." }); clearAnalysis(); }
+    if (current()) { cancelDelay?.(); useComputer.setState({ thinking: false, reviewingMove: false, error: error instanceof Error ? error.message : "Stockfish failed. Retry to continue." }); clearAnalysis(); }
   }
 }
 export const useComputer = create<State>((set, get) => ({
   showFeedback: true, feedback: {}, feedbackPly: null, positions: {}, reviewConfig: { preset: "standard", multiPv: 3 },
-  active: false, starting: false, assisted: false, thinking: false, error: null, bot: BOTS[0], human: "w", result: null, id: null,
+  active: false, starting: false, assisted: false, thinking: false, reviewingMove: false, error: null, bot: BOTS[0], human: "w", result: null, id: null,
   start: async (bot, side, assisted = false, random = Math.random, showFeedback = true) => {
     if (get().starting || get().active) return;
     set({ starting: true, error: null });
@@ -172,6 +187,7 @@ export const useComputer = create<State>((set, get) => ({
       useReviewDialog.getState().close(); await useGameAnalysis.getState().pause();
       useAnalysis.getState().stop(); clearAnalysis();
       release = engineClient().acquire("computer"); engineClient().newGame("computer");
+      void useOpenings.getState().load();
       const w = useWorkspace.getState();
       snapshot ??= { game: w.game, imported: w.imported, freeGame: w.freeGame, selectedPath: w.selectedPath, navigationPaths: w.navigationPaths, orientation: w.orientation };
       const human = humanColor(side, random); randomMove = random; endingReason = "normal";
@@ -188,7 +204,7 @@ export const useComputer = create<State>((set, get) => ({
   retry: () => { if (get().result) void finish(); else schedule(); },
   resign: () => { if (get().active && !get().result) void finish(get().human, "resignation"); },
   exit: () => {
-    unlockEngine(); clearTimeout(feedbackTimer); set({ feedbackPly: null, active: false, assisted: false, thinking: false, result: null, error: null });
+    unlockEngine(); clearTimeout(feedbackTimer); set({ feedbackPly: null, active: false, assisted: false, thinking: false, reviewingMove: false, result: null, error: null });
     useReviewDialog.getState().close();
     useWorkspace.setState({ ...snapshot, computer: null, boardTransition: "replace", boardEpoch: useWorkspace.getState().boardEpoch + 1 }); snapshot = undefined;
   },

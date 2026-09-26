@@ -57,8 +57,15 @@ it("collects unrestricted positions even with assistance off, grading only human
   await vi.waitFor(() => expect(useComputer.getState().positions[0]).toBeDefined());
   const config = useComputer.getState().reviewConfig;
   useAnalysis.setState({ preferences: { ...useAnalysis.getState().preferences, preset: "deep", multiPv: 5 } });
+  let shown = 0;
+  const unsubscribe = useComputer.subscribe(state => { if (state.feedbackPly === 1 && !shown) shown = Date.now(); });
   useWorkspace.getState().move("e2", "e4");
-  await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true));
+  await vi.waitFor(() => expect(useComputer.getState().feedbackPly).toBe(1));
+  expect(worker.requests.some(row => row.bot)).toBe(false);
+  expect(useWorkspace.getState().computer?.locked).toBe(true);
+  expect(useComputer.getState().reviewingMove).toBe(true);
+  await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true), { timeout: 2000 });
+  unsubscribe(); expect(Date.now() - shown).toBeGreaterThanOrEqual(1000);
   worker.complete(worker.requests.find(row => row.bot)!, "e7e5");
   await vi.waitFor(() => expect(useComputer.getState().feedback[1]).toBeDefined());
   expect(useWorkspace.getState().game.cursor).toBe(1); // Result ready, minimum delay still pending.
@@ -82,6 +89,17 @@ it("cancels a ready bot move during its delay on exit and never applies it to th
   expect(useWorkspace.getState().game.cursor).toBe(0); expect(useComputer.getState().feedback).toEqual({});
   expect(useComputer.getState().showFeedback).toBe(false);
 });
+it("cancels the feedback hold on exit before any bot calculation starts", async () => {
+  worker.autoReview = true;
+  await useComputer.getState().start(BOTS[0], "white", false, () => 0);
+  useWorkspace.getState().move("e2", "e4");
+  await vi.waitFor(() => expect(useComputer.getState().feedbackPly).toBe(1));
+  expect(worker.requests.some(row => row.bot)).toBe(false);
+  useComputer.getState().exit();
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  expect(worker.requests.some(row => row.bot)).toBe(false);
+  expect(useWorkspace.getState().game.cursor).toBe(0);
+});
 it("cancels pending bot replies on timeout and opens the existing review with the terminal result", async () => {
   const opening = vi.spyOn(useReviewDialog.getState(), "opening").mockResolvedValue();
   await useComputer.getState().start(BOTS[0], "black", false, () => 1);
@@ -104,7 +122,7 @@ it("defaults assistance off, locks Black until the opening bot move, and preserv
   useComputer.getState().exit(); expect(useWorkspace.getState().game.cursor).toBe(0);
 });
 it("cancels assistance synchronously, gives the bot priority, rejects stale results and clears overlays", async () => {
-  await useComputer.getState().start(BOTS[0], "white", true);
+  await useComputer.getState().start(BOTS[0], "white", true, Math.random, false);
   await vi.waitFor(() => expect(worker.requests).toHaveLength(1)); const assistance = worker.requests[0];
   expect(assistance.bot).toBeUndefined();
   useWorkspace.getState().move("e2", "e4"); expect(useAnalysis.getState().result).toBeNull(); expect(useAnalysis.getState().fen).toBeNull();
@@ -133,7 +151,7 @@ it("saves resignation as a normal computer PGN and automatically opens the exist
 it("automatically completes a terminal bot move and recovers from startup failure", async () => {
   const opening = vi.spyOn(useReviewDialog.getState(), "opening").mockResolvedValue();
   worker.autoReview = true;
-  await useComputer.getState().start(BOTS[5], "white", false, () => 0);
+  await useComputer.getState().start(BOTS[5], "white", false, () => 0, false);
   const game = createGame(); for (const san of ["f3", "e5", "g4"]) { const chess = chessAt(game), move = chess.move(san); game.moves.push({ from: move.from, to: move.to, san: move.san }); game.cursor++; }
   useWorkspace.setState({ game });
   await vi.waitFor(() => expect(worker.requests).toHaveLength(1)); worker.emit({ type: "error", message: "Startup failed" });

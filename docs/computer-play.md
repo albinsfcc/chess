@@ -26,7 +26,9 @@ Assistance uses stored review-quality results after board animation settles on t
 
 ## Incremental storage and review
 
-The review configuration is captured from Settings at game start and remains fixed independently of bot level or later setting changes. Bot searches have priority; unrestricted review searches run serially through the same client. Weakened bot results are rejected from incremental review storage.
+The review configuration is captured from Settings at game start and remains fixed independently of bot level or later setting changes. With feedback enabled, the human move is analyzed first and its grade is displayed for one second before the bot search and natural thinking delay begin. Without feedback, bot searches have priority. All searches run serially through the same client. Weakened bot results are rejected from incremental review storage.
+
+Opening variety reuses the installed CC0 opening index. During the first twelve plies, bots request five engine candidates within their existing search budget and sample legal book continuations. Allowed loss ranges from 25 centipawns for Atlas to 75 for Ollie, measured from the moving side's perspective; better evaluations have higher selection weight. Forced mates, unavailable book data, or fewer than two qualifying lines fall back to ordinary bot selection. Constants and injectable randomness are centralized in `src/lib/computer.ts`.
 
 Every completed position is cached and journaled in IndexedDB with game ID, ply, FEN, configuration hash, engine version, depth, score, best move and MultiPV lines. Quick human moves cannot skip positions: the next collection pass fills missing plies. Completed records survive interruption, although unfinished games are not automatically restored or continued after reload.
 
@@ -54,7 +56,7 @@ Mate, resignation, draws, and a timeout ending hook use the same completion path
 ## Validation
 
 - `npm run typecheck`: passed.
-- `npm run test`: 316 tests passed across 34 files.
+- `npm run test`: 318 tests passed across 34 files, including feedback hold/cancellation and opening variety for both colours and all six bots.
 - ESLint on application source and changed tests/config: passed.
 - `npm run build`: passed.
 - `npx playwright test --config=playwright.computer.config.ts`: 16 desktop/mobile tests passed, including appearance persistence/fallback, real Stockfish startup, assistance cleanup, incremental review/accuracy, and existing PGN/Chess.com/Lichess import flows.

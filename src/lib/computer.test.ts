@@ -1,6 +1,7 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { attackedHumanPieces, BOTS, chooseBotMove, computerResult, humanColor } from "./computer";
+import { attackedHumanPieces, BOTS, chooseBotMove, chooseOpeningMove, computerResult, humanColor } from "./computer";
+import { installOpeningIndex, openingKey } from "./openings";
 import { ENGINE_BUILD, type EngineResult } from "./engine/domain";
 import { UciSession } from "./engine/session";
 
@@ -10,6 +11,25 @@ function result(chess: Chess): EngineResult {
     lines: moves.map((move, i) => ({ multiPv: i + 1, depth: 1, score: { type: "cp", value: 0 }, lowerBound: false, upperBound: false, pvUci: [move.lan], pvSan: [move.san], replayComplete: true })) };
 }
 describe("computer profiles and rules", () => {
+  it("varies legal book continuations for every bot with seeded randomness and strength limits", () => {
+    for (const black of [false, true]) {
+      const chess = new Chess(); if (black) chess.move("e4");
+      const moves = black ? ["e7e5", "c7c5", "a7a5"] : ["e2e4", "d2d4", "a2a4"];
+      installOpeningIndex({ version: 1, repository: "test", commit: "0".repeat(40), license: "CC0-1.0", maxPly: 12,
+        entries: [{ name: "Opening", eco: "A00", pgn: "", ply: 1 }], named: {}, edges: { [openingKey(chess.fen())]: Object.fromEntries(moves.map(move => [move, 0])) } });
+      const analysis = result(chess);
+      analysis.lines = moves.map((move, i) => ({ ...analysis.lines[0], multiPv: i + 1, pvUci: [move], score: { type: "cp", value: (black ? -1 : 1) * (30 - i * 20) } }));
+      for (const bot of BOTS) {
+        const picks = Array.from({ length: 10 }, (_, seed) => chooseOpeningMove(chess, analysis, bot, () => seed / 10));
+        expect(new Set(picks).size).toBeGreaterThan(1);
+        expect(picks.every(move => moves.includes(move!))).toBe(true);
+        if (bot.name === "Atlas") expect(picks).not.toContain(moves[2]);
+      }
+      analysis.lines[0].score = { type: "mate", moves: black ? -3 : 3 };
+      expect(chooseOpeningMove(chess, analysis, BOTS[5])).toBeNull();
+      analysis.lines = []; expect(chooseOpeningMove(chess, analysis, BOTS[0])).toBeNull();
+    }
+  });
   it("defines six increasing strengths and an unrestricted browser-budget master", () => {
     expect(BOTS.map((b) => [b.name, b.level, b.rating])).toEqual([["Ollie", "Beginner", 400], ["Mira", "Easy", 700], ["Nova", "Casual", 1000], ["Kairo", "Club", 1300], ["Orion", "Expert", 1700], ["Atlas", "Master", 2100]]);
     expect(BOTS[5].search).toEqual({ timeMs: 2000 });
