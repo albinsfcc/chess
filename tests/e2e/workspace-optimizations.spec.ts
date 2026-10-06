@@ -43,7 +43,7 @@ test("top-move arrows, smooth evaluation and opponent threats follow preferences
   const worker = (await build({ entryPoints: ["tests/fixtures/game-analysis-worker.ts"], bundle: true, write: false, format: "iife", platform: "browser" })).outputFiles[0].text;
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await page.emulateMedia({ reducedMotion: "no-preference" }); await page.goto("/");
-  await page.getByRole("button", { name: "Settings", exact: true }).click(); await page.getByLabel("Principal variations count", { exact: true }).selectOption("5");
+  await page.getByRole("button", { name: "Settings", exact: true }).click(); await page.getByLabel("Principal variations count", { exact: true }).click(); await page.getByRole("option", { name: "5", exact: true }).click();
   await page.getByRole("switch", { name: "Show threats", exact: true }).click(); await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Analyze Position", exact: true }).click();
   await expect(page.locator('[data-arrow-count="5"]')).toHaveCount(1);

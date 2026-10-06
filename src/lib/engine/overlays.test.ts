@@ -59,12 +59,12 @@ describe("opponent immediate threats", () => {
   });
 });
 describe("transparent move labels", () => {
-  it.each([[0, "Excellent"], [30, "Excellent"], [40, "Good"], [80, "Good"], [100, "Inaccuracy"], [160, "Inaccuracy"], [200, "Mistake"], [300, "Mistake"], [400, "Blunder"]])("grades loss %s as %s", (loss, label) => {
+  it.each([[0, "Excellent"], [30, "Excellent"], [40, "Good"], [80, "Good"], [100, "Inaccuracy"], [160, "Inaccuracy"], [200, "Mistake"], [300, "Blunder"], [400, "Blunder"]])("grades loss %s as %s", (loss, label) => {
     const { before, after, played } = pair(Number(loss)); expect(classifyMove(before, after, played)?.label).toBe(label);
   });
   it("uses Black's perspective", () => {
     const chess = new Chess(); chess.move("e4");
-    const { before, after, played } = pair(500, "e7e5", chess.fen()); expect(classifyMove(before, after, played)?.label).toBe("Blunder");
+    const { before, after, played } = pair(500, "e7e5", chess.fen()); expect(classifyMove(before, after, played)?.label).toBe("Mistake");
   });
   it("distinguishes Best from Great with a measured alternative gap", () => {
     const { before, after, played } = pair(0, "e2e4");
@@ -91,6 +91,6 @@ describe("transparent move labels", () => {
     after.lines[0].score = { type: "mate", moves: -2 };
     expect(classifyMove(before, after, played)?.label).toBe("Blunder");
     after.lines[0].score = { type: "cp", value: 100 }; before.lines[0].score = { type: "mate", moves: 3 };
-    expect(classifyMove(before, after, played)?.label).toBe("Blunder");
+    expect(classifyMove(before, after, played)?.label).toBe("Miss");
   });
 });

@@ -1,3 +1,5 @@
+import { centipawnLoss, expectedPoints } from "./move-loss";
+export { expectedPoints } from "./move-loss";
 import { Chess } from "chess.js";
 import type { EngineResult } from "../engine/domain";
 import type { PositionAnalysis } from "./domain";
@@ -5,7 +7,7 @@ import { evaluationChange } from "./evaluation";
 import { bookContinuation, type OpeningIndex } from "../openings";
 
 // Original, deliberately conservative heuristics; not a platform's proprietary grading.
-export const MOVE_QUALITY = { minimumDepth: 12, excellent: 0.02, good: 0.05, inaccuracy: 0.10, mistake: 0.20, greatGap: 150, sacrifice: 2, sacrificePlies: 6, healthy: -50, winning: 600, greatPointsGap: 0.15, brilliantMaxCpLoss: 30 } as const;
+export const MOVE_QUALITY = { minimumDepth: 12, decisiveAdvantage: 200, excellent: 0.02, good: 0.05, inaccuracy: 0.10, mistake: 0.20, greatGap: 150, sacrifice: 2, sacrificePlies: 6, healthy: -50, winning: 600, greatPointsGap: 0.15, brilliantMaxCpLoss: 30 } as const;
 export type MoveLabel = "Brilliant" | "Great" | "Best" | "Excellent" | "Good" | "Inaccuracy" | "Mistake" | "Blunder" | "Book" | "Forced" | "Miss" | "Missed Win";
 export type MoveAssessment = { label: MoveLabel; reason: string; provisional?: boolean };
 export type GradingContext = { book?: string; previous?: EngineResult };
@@ -27,8 +29,6 @@ const values = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 function material(chess: Chess, color: "w" | "b") {
   return chess.board().flat().reduce((sum, piece) => sum + (piece ? values[piece.type] * (piece.color === color ? 1 : -1) : 0), 0);
 }
-/** Rating-neutral expected-points approximation, not Chess.com's unpublished model. */
-export function expectedPoints(cp: number) { return 1 / (1 + Math.exp(-Math.max(-10000, Math.min(10000, cp)) / 400)); }
 export function pointsLossLabel(loss: number): MoveLabel {
   return loss <= MOVE_QUALITY.excellent ? "Excellent" : loss <= MOVE_QUALITY.good ? "Good" : loss <= MOVE_QUALITY.inaccuracy ? "Inaccuracy" : loss <= MOVE_QUALITY.mistake ? "Mistake" : "Blunder";
 }
@@ -71,7 +71,7 @@ export function classifyMove(before: EngineResult, after: EngineResult, played: 
     // Prefer a comparable same-position MultiPV score over a separate search's drift.
     const candidate = before.lines.find((line) => line.pvUci[0] === played && line.depth >= a.depth && !line.lowerBound && !line.upperBound);
     const playedScore = candidate?.score ?? b.score;
-    const loss = a.score.type === "cp" && playedScore.type === "cp" ? Math.max(0, expectedPoints(a.score.value * sign) - expectedPoints(playedScore.value * sign)) : null;
+    const loss = a.score.type === "cp" && playedScore.type === "cp" ? centipawnLoss(a.score.value * sign, playedScore.value * sign) : null;
     const sound = b.score.type === "cp" ? b.score.value * sign >= MOVE_QUALITY.healthy : b.score.moves * sign > 0;
     // An upper bound from the mover's perspective can establish that the alternative
     // is not winning; never mistake the winning top move itself for a winning fallback.
@@ -88,15 +88,23 @@ export function classifyMove(before: EngineResult, after: EngineResult, played: 
     if (best) {
       return graded("Best", "Matches the engine's top move for the position before it was played. A separate search's evaluation drift does not downgrade this choice.");
     }
+    const winningBefore = a.score.type === "mate" ? a.score.moves * sign > 0 : a.score.value * sign >= MOVE_QUALITY.decisiveAdvantage;
+    const losingAfter = playedScore.type === "mate" ? playedScore.moves * sign < 0 : playedScore.value * sign <= -MOVE_QUALITY.decisiveAdvantage;
+    const healthyBefore = a.score.type === "mate" ? winningBefore : a.score.value * sign >= MOVE_QUALITY.healthy;
+    const reversedOutcome = healthyBefore && losingAfter;
     const change = evaluationChange(a.score, playedScore, mover);
     if (change.type === "mate") {
-      if (change.facts.some((fact) => fact.kind === "lost-forced-mate" || fact.kind === "allowed-forced-mate")) return graded("Blunder", "Lost a forced mate or newly allowed the opponent a forced mate.");
+      if (reversedOutcome) return graded("Blunder", "Changed a healthy or winning position into a losing position, including forced-mate outcomes.");
+      if (change.facts.some(fact => fact.kind === "lost-forced-mate")) return graded("Miss", "Missed the forced-mate continuation, but the resulting evaluation does not establish a losing position. Mate distances are not centipawns.");
+      if (change.facts.some(fact => fact.kind === "allowed-forced-mate")) return graded("Mistake", "Allowed the opponent a forced mate from a position that was not established as winning.");
       return graded(change.facts.some((fact) => fact.kind === "found-forced-mate" || (fact.kind === "maintained-forced-mate" && fact.winner === mover)) ? "Excellent" : "Good", "Mate transition assessed separately; no centipawn number is invented for mate.");
     }
     if (change.type !== "cp" || loss === null) return null;
     const previous = context.previous, previousLine = previous?.lines.find((line) => line.multiPv === 1);
     if (previous && previous.engineVersion === before.engineVersion && previous.engineBuild === before.engineBuild && previous.config.preset === before.config.preset && previous.config.multiPv === before.config.multiPv && previousLine?.score.type === "cp" && !previousLine.lowerBound && !previousLine.upperBound && a.score.type === "cp" && playedScore.type === "cp" && previousLine.score.value * sign <= 50 && a.score.value * sign >= 200 && playedScore.value * sign <= 50 && change.loss >= 150) return graded("Miss", "The opponent's preceding move offered at least +2.00; this move lost that opportunity, returning to equal or worse (+0.50 or below).");
-    return graded(pointsLossLabel(loss), `${(loss * 100).toFixed(1)} percentage points lost in our rating-neutral expected-points approximation${candidate ? "; uses the same-position MultiPV score" : "; uses adjacent position searches"}.`);
+    if (winningBefore && playedScore.type === "cp" && playedScore.value * sign >= MOVE_QUALITY.decisiveAdvantage && loss > MOVE_QUALITY.inaccuracy) return graded("Miss", "Missed a substantially stronger continuation, giving up a significant advantage while retaining a winning position.");
+    const severity = pointsLossLabel(loss);
+    return graded(reversedOutcome ? "Blunder" : severity === "Blunder" ? "Mistake" : severity, `${(loss * 100).toFixed(1)} percentage points of local outcome/material loss${candidate ? "; uses the same-position MultiPV score" : "; uses adjacent position searches"}.`);
   } catch { return null; }
 }
 export function assessPosition(row: PositionAnalysis, records: PositionAnalysis[]): MoveAssessment | null {

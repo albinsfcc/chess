@@ -24,8 +24,8 @@ test("global settings drive one-click full main-line review and summary moves to
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await setup(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByLabel("Analysis preset", { exact: true }).selectOption("quick");
-  await page.getByLabel("Principal variations count", { exact: true }).selectOption("2");
+  await page.getByLabel("Analysis preset", { exact: true }).click(); await page.getByRole("option", { name: /^Quick/ }).click();
+  await page.getByLabel("Principal variations count", { exact: true }).click(); await page.getByRole("option", { name: "2", exact: true }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Variation 1... Nf6", exact: true }).click();
   await page.getByRole("button", { name: "Review game", exact: true }).click();
@@ -37,7 +37,7 @@ test("global settings drive one-click full main-line review and summary moves to
   await expect(card).toBeVisible(); await expect(card).toContainText("4 / 4 moves graded");
   await expect(card).toContainText("quick · 2 lines");
   expect(await page.getByLabel("Game workspace panels", { exact: true }).locator(":scope > section").first().getAttribute("aria-label")).toBe("Game review card");
-  await card.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("1");
+  await card.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 1\b/ }).click();
   await expect(page.getByTestId("square-e4")).toHaveAttribute("aria-label", "e4, White pawn");
   await page.reload(); await page.getByRole("button", { name: "Open Alice vs Bob", exact: true }).click();
   await expect(card).toContainText("4 / 4 moves graded");

@@ -49,7 +49,7 @@ export class UciSession {
     const limited = !!(request.bot?.elo && limit && elo);
     if (limit) this.send(`setoption name UCI_LimitStrength value ${limited}`);
     if (limited) this.send(`setoption name UCI_Elo value ${Math.max(elo!.min ?? 0, Math.min(elo!.max ?? 4000, request.bot!.elo!))}`);
-    if (skill) this.send(`setoption name Skill Level value ${skill.max ?? 20}`);
+    if (skill) this.send(`setoption name Skill Level value ${!limited && request.bot?.skill !== undefined ? Math.max(skill.min ?? 0, Math.min(skill.max ?? 20, request.bot.skill)) : skill.max ?? 20}`);
     this.send(`setoption name MultiPV value ${request.config.multiPv}`);
     this.send(`position fen ${request.fen}`);
     this.send(`go movetime ${request.bot?.timeMs ?? PRESETS[request.config.preset]}${request.bot?.depth ? ` depth ${request.bot.depth}` : ""}`);

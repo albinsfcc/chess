@@ -99,7 +99,7 @@ export const useAnalysis = create<AnalysisState>((set, get) => ({
     refreshThreats();
     serial++; const client = engineClient(); if (newGame) client.newGame(); else client.stop();
     set({ result: null, fen: null, cached: false, error: null, status: "stopped", assessment: null });
-    if (get().enabled && get().preferences.automatic) void get().analyze();
+    if (get().enabled) void get().analyze();
   },
 }));
 

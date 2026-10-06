@@ -9,6 +9,7 @@ export function BoardMoveBadge({ square, orientation, assessment, san }: { squar
   const { column, row } = badgeSquare(square, orientation);
   return <div className="pointer-events-none absolute z-30" style={{ left: `${column * 12.5}%`, top: `${row * 12.5}%`, width: "12.5%", height: "12.5%" }}>
     <button type="button" data-testid="board-move-badge" data-square={square} aria-label={`${san}: ${assessment.label}. ${assessment.reason}`} aria-expanded={expanded}
+      style={{ scale: 1.5, transform: `translate(12px, ${row === 0 ? 8 : -12}px)`, transformOrigin: "top right", ...(column === 7 ? { right: 18 } : {}) }}
       title={`${san}: ${assessment.label}`} onClick={() => setExpanded(!expanded)} onBlur={() => setExpanded(false)} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setExpanded(false); } }}
       className="pointer-events-auto absolute right-0 top-0 flex size-[42%] max-h-9 max-w-9 items-center justify-center rounded-full shadow-md">
       <MoveStrengthIcon label={assessment.label} className="size-full" /></button>

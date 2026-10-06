@@ -1,12 +1,13 @@
 import { z } from "zod";
+import { BOARD_TEXTURES } from "./board-textures";
 
 export const PREFERENCES_KEY = "chess-review:board-preferences:v1";
 export const preferencesSchema = z.object({
   lightSquare: z.string().regex(/^#[0-9a-f]{6}$/i),
   darkSquare: z.string().regex(/^#[0-9a-f]{6}$/i),
   showCoordinates: z.boolean(),
-  boardTexture: z.enum(["plain", "wooden"]).default("plain"),
-  pieceSet: z.enum(["classic", "carved"]).default("classic"),
+  boardTexture: z.enum(["plain", "wooden", ...BOARD_TEXTURES.map(texture => texture.id)]).default("plain"),
+  pieceSet: z.enum(["classic", "carved", "sculpted", "soft-classic"]).default("classic"),
 });
 export type BoardPreferences = z.infer<typeof preferencesSchema>;
 export const defaultPreferences: BoardPreferences = {

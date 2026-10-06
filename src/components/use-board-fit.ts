@@ -23,7 +23,12 @@ export function useBoardFit() {
       const rail = element.querySelector<HTMLElement>(".evaluation-column");
       const board = element.querySelector<HTMLElement>(".board-with-evaluation");
       const extra = rail && board ? rail.getBoundingClientRect().width + parseFloat(getComputedStyle(board).columnGap) : 64;
-      const width = Math.floor(Math.max(0, Math.min(element.clientWidth, element.clientHeight - chrome - 2 + extra)));
+      const fittedWidth = Math.floor(Math.max(0, element.clientHeight - chrome - 2 + extra));
+      // Let focus mode center the board and move panel together. Use the height
+      // budget, not the current column width, to avoid a shrinking resize loop.
+      const grid = element.closest<HTMLElement>(".workspace-grid");
+      if (grid && grid.style.getPropertyValue("--fitted-board-width") !== `${fittedWidth}px`) grid.style.setProperty("--fitted-board-width", `${fittedWidth}px`);
+      const width = Math.floor(Math.max(0, Math.min(element.clientWidth, fittedWidth)));
       if (content.style.getPropertyValue("--chess-area-width") !== `${width}px`) content.style.setProperty("--chess-area-width", `${width}px`);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };

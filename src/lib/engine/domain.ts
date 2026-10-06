@@ -29,7 +29,7 @@ export const resultSchema = z.object({
 });
 export type EngineResult = z.infer<typeof resultSchema>;
 export type EngineStatus = "loading" | "ready" | "analyzing" | "stopped" | "error";
-export const botSearchSchema = z.object({ timeMs: z.number().int().min(20).max(2000), depth: z.number().int().min(1).max(30).optional(), elo: z.number().int().positive().optional() });
+export const botSearchSchema = z.object({ timeMs: z.number().int().min(20).max(2000), depth: z.number().int().min(1).max(30).optional(), elo: z.number().int().positive().optional(), skill: z.number().int().min(0).max(20).optional() });
 export type BotSearch = z.infer<typeof botSearchSchema>;
 export type UciOption = { name: string; type: string; min?: number; max?: number };
 export const searchSchema = z.object({ requestId: z.string().min(1), fen: z.string().max(200), config: configSchema, bot: botSearchSchema.optional() });

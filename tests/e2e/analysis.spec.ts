@@ -34,8 +34,8 @@ test("assisted analysis: moves stay interactive, stale arrows clear, settings pe
   await expect(page.getByTestId("engine-status")).toHaveText("ready");
   await expect(page.getByTestId("engine-best-move")).toContainText("e5");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByLabel("Analysis preset", { exact: true }).selectOption("quick");
-  await page.getByLabel("Principal variations count", { exact: true }).selectOption("5");
+  await page.getByLabel("Analysis preset", { exact: true }).click(); await page.getByRole("option", { name: /^Quick/ }).click();
+  await page.getByLabel("Principal variations count", { exact: true }).click(); await page.getByRole("option", { name: "5", exact: true }).click();
   await page.getByLabel("Show best-move arrow", { exact: true }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByLabel("Principal variations", { exact: true }).getByRole("listitem")).toHaveCount(5);
@@ -64,7 +64,7 @@ test("real local WASM returns a legal best move and permits board interaction", 
   await page.goto("/");
   await chooseFreePlay(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByLabel("Analysis preset", { exact: true }).selectOption("quick");
+  await page.getByLabel("Analysis preset", { exact: true }).click(); await page.getByRole("option", { name: /^Quick/ }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Analyze Position", exact: true }).click();
   await expect(page.getByTestId("engine-status")).toHaveText("ready", { timeout: 40_000 });
@@ -73,7 +73,7 @@ test("real local WASM returns a legal best move and permits board interaction", 
   expect(new Chess(DEFAULT_POSITION).move({ from: best!.slice(0, 2), to: best!.slice(2, 4), promotion: best![4] })).toBeTruthy();
   expect(workers.filter((url) => url.includes("analysis-worker"))).toHaveLength(1);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByLabel("Analysis preset", { exact: true }).selectOption("deep");
+  await page.getByLabel("Analysis preset", { exact: true }).click(); await page.getByRole("option", { name: /^Deep/ }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Analyze Position", exact: true }).click();
   await expect(page.getByTestId("engine-status")).toHaveText("analyzing");
@@ -105,7 +105,7 @@ test("real local WASM completes a game queue using the existing worker", async (
   await page.getByRole("button", { name: "Review game", exact: true }).click();
     await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toHaveText("3 / 3 positions · completed", { timeout: 40_000 });
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("1");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 1\b/ }).click();
   const board = new Chess(); board.move("e4");
   const best = await page.getByTestId("chessboard").getAttribute("data-best-move");
   expect(best).toBeTruthy();

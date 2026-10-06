@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MoveList } from "./move-list";
 import { treeNode, USER_BRANCH } from "@/lib/pgn/position";
@@ -8,12 +10,25 @@ import { useWorkspace } from "@/store/workspace";
 import { platformName } from "@/lib/platforms/domain";
 
 export function ImportedGameViewer() {
+  const [clipboard, setClipboard] = useState<{ gameId: string; status: "copying" | "copied" | "error" } | null>(null);
   const imported = useWorkspace((state) => state.imported);
   const game = useWorkspace((state) => state.game);
   const selectedPath = useWorkspace((state) => state.selectedPath);
   const select = useWorkspace((state) => state.selectNode);
   if (!imported) return null;
   const record = imported.game;
+  const copyStatus = clipboard?.gameId === record.id ? clipboard.status : null;
+  const completed = record.result !== "*";
+  async function copyPgn() {
+    if (!completed || copyStatus === "copying") return;
+    setClipboard({ gameId: record.id, status: "copying" });
+    try {
+      await navigator.clipboard.writeText(record.rawPgn);
+      setClipboard({ gameId: record.id, status: "copied" });
+    } catch {
+      setClipboard({ gameId: record.id, status: "error" });
+    }
+  }
   const active = treeNode(imported.tree, selectedPath);
   const branch = selectedPath[0] === USER_BRANCH ? imported.tree.userBranches?.[selectedPath[1]] : undefined;
   const rootNode = branch ? treeNode(imported.tree, branch.root) : undefined;
@@ -35,7 +50,12 @@ export function ImportedGameViewer() {
         {imported.tree.userBranches?.map((variation, index) => <details key={index} open={selectedPath[0] === USER_BRANCH && selectedPath[1] === index} className="mt-2 border-l-2 border-primary/30 pl-2"><summary className="cursor-pointer text-sm">Local variation {index + 1} from {variation.root.length ? `ply ${variation.moves[0].ply - 1}` : "start"}</summary><MoveList nodes={variation.moves} variation /></details>)}
       </div>
       <div className="space-y-2 border-t px-5 py-3">
-        <Button variant="secondary" size="sm" onClick={() => select(mainLineReturn(imported.tree, selectedPath))}>Return to main line</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => select(mainLineReturn(imported.tree, selectedPath))}>Return to main line</Button>
+          <Button variant="outline" size="sm" disabled={!completed || copyStatus === "copying"} title={completed ? "Copy the complete saved game PGN" : "Available when the game has a result"} onClick={() => void copyPgn()}>{copyStatus === "copied" ? <Check size={15} /> : <Copy size={15} />}Copy PGN</Button>
+        </div>
+        {copyStatus === "copied" && <p role="status" className="text-xs text-primary">PGN copied to clipboard.</p>}
+        {copyStatus === "error" && <p role="alert" className="text-xs text-destructive">Could not copy PGN. Allow clipboard access in your browser, then try again.</p>}
         <p className="text-xs text-muted-foreground">← / → Previous / Next · ↑ / ↓ First / Last (also Home / End)</p>
       </div>
       <div className="space-y-2 border-t p-5" aria-label="Position comments" aria-live="polite">

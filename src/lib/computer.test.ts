@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { attackedHumanPieces, BOTS, chooseBotMove, chooseOpeningMove, computerResult, humanColor } from "./computer";
+import { attackedHumanPieces, BOTS, canQueuePremove, chooseBotMove, chooseOpeningMove, computerResult, humanColor } from "./computer";
 import { installOpeningIndex, openingKey } from "./openings";
 import { ENGINE_BUILD, type EngineResult } from "./engine/domain";
 import { UciSession } from "./engine/session";
@@ -11,6 +11,17 @@ function result(chess: Chess): EngineResult {
     lines: moves.map((move, i) => ({ multiPv: i + 1, depth: 1, score: { type: "cp", value: 0 }, lowerBound: false, upperBound: false, pvUci: [move.lan], pvSan: [move.san], replayComplete: true })) };
 }
 describe("computer profiles and rules", () => {
+  it("queues human piece geometry including contingent captures, castling and promotion", () => {
+    const chess = new Chess();
+    expect(canQueuePremove(chess, "b", "g8", "f6")).toBe(true);
+    expect(canQueuePremove(chess, "b", "g8", "g6")).toBe(false);
+    expect(canQueuePremove(chess, "b", "e2", "e4")).toBe(false);
+    expect(canQueuePremove(chess, "w", "e2", "d3")).toBe(true);
+    expect(canQueuePremove(chess, "w", "e1", "g1")).toBe(true);
+    expect(canQueuePremove(chess, "w", "e2", "e5")).toBe(false);
+    expect(canQueuePremove(new Chess("7k/P7/8/8/8/8/8/7K w - - 0 1"), "w", "a7", "a8")).toBe(true);
+    expect(canQueuePremove(chess, "w", "invalid", "e4")).toBe(false);
+  });
   it("varies legal book continuations for every bot with seeded randomness and strength limits", () => {
     for (const black of [false, true]) {
       const chess = new Chess(); if (black) chess.move("e4");
@@ -44,6 +55,31 @@ describe("computer profiles and rules", () => {
     expect(chooseBotMove(chess, analysis, BOTS[5], () => .99)).toBe(analysis.lines[0].pvUci[0]);
     const picks = BOTS.map((bot) => Array.from({ length: 100 }, (_, i) => chooseBotMove(chess, analysis, bot, () => i / 100)).filter((move) => move === analysis.lines[0].pvUci[0]).length);
     expect(picks).toEqual([...picks].sort((a, b) => a - b));
+  });
+  it("Mira overlooks the engine shortlist on 32% of seeded turns, including openings", () => {
+    const chess = new Chess(), analysis = result(chess);
+    const shortlist = new Set(analysis.lines.map(line => line.pvUci[0]));
+    for (const opening of [false, true]) {
+      const picks = Array.from({ length: 100 }, (_, seed) => chooseBotMove(chess, analysis, BOTS[1], () => (seed + .5) / 100, opening));
+      expect(picks.filter(move => !shortlist.has(move))).toHaveLength(32);
+      expect(picks.every(move => chess.moves({ verbose: true }).some(legal => legal.lan === move))).toBe(true);
+    }
+  });
+  it("has progressively fewer oversights and handles positions with only one legal move", () => {
+    expect(BOTS.map(bot => bot.oversightChance)).toEqual([.5, .32, .16, .06, 0, 0]);
+    const chess = new Chess("7r/8/8/8/8/5k2/8/7K w - - 0 1");
+    for (const bot of BOTS) expect(chooseBotMove(chess, result(chess), bot, () => 0)).toBe("h1g1");
+  });
+  it("uses runtime Skill Level fallback without Elo support and restores it for review", () => {
+    const commands: string[] = [], session = new UciSession(command => commands.push(command), () => {});
+    session.command({ type: "initialize" });
+    session.receive("option name Skill Level type spin default 20 min 0 max 20\nuciok\nreadyok");
+    const request = { requestId: "bot", fen: new Chess().fen(), config: { preset: "quick" as const, multiPv: 5 }, bot: BOTS[1].search };
+    session.command({ type: "search", request });
+    expect(commands).toContain("setoption name Skill Level value 1");
+    session.receive("bestmove e2e4\nreadyok");
+    session.command({ type: "search", request: { ...request, bot: undefined } });
+    expect(commands.slice(-5)).toContain("setoption name Skill Level value 20"); session.dispose();
   });
   it.each(BOTS)("$name only selects legal moves, including special positions", (bot) => {
     for (const fen of [undefined, "7k/P7/8/8/8/8/8/7K w - - 0 1", "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2"]) {

@@ -50,6 +50,48 @@ it("chooses delays at both boundaries and cancels a pending nonblocking timer", 
     delay.cancel(); await Promise.resolve(); expect(ready).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
   } finally { vi.useRealTimers(); }
 });
+it("queues one premove, applies it once after the bot reply, and supports cancellation", async () => {
+  worker.autoReview = true;
+  await useComputer.getState().start(BOTS[0], "black", false, () => 0, false);
+  expect(useComputer.getState().queuePremove("e2", "e4")).toBe(false);
+  expect(useComputer.getState().queuePremove("g8", "f6")).toBe(true);
+  useComputer.getState().cancelPremove(); expect(useComputer.getState().premove).toBeNull();
+  useComputer.getState().queuePremove("g8", "f6");
+  useComputer.getState().playPremove(); expect(useWorkspace.getState().game.cursor).toBe(0);
+  await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true));
+  worker.complete(worker.requests.find(row => row.bot)!, "e2e4");
+  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 3000 });
+  useComputer.getState().playPremove(); useComputer.getState().playPremove();
+  expect(useWorkspace.getState().game.cursor).toBe(2);
+  expect(chessAt(useWorkspace.getState().game).get("f6")).toMatchObject({ type: "n", color: "b" });
+  expect(useComputer.getState().premove).toBeNull();
+});
+it.each([
+  { fen: "4k3/8/8/8/8/8/r7/R3K3 b Q - 0 1", from: "a1", to: "a3", reply: "a2a1", finalPly: 1 },
+  { fen: "7k/P5r1/8/8/8/8/8/7K b - - 0 1", from: "a7", to: "a8", reply: "g7g6", finalPly: 2 },
+])("revalidates a premove after capture and preserves underpromotion: $from$to", async ({ fen, from, to, reply, finalPly }) => {
+  worker.autoReview = true;
+  await useComputer.getState().start(BOTS[0], "white", false, () => 0, false);
+  useWorkspace.setState({ game: createGame(fen) });
+  expect(useComputer.getState().queuePremove(from, to, "n")).toBe(true);
+  await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true));
+  worker.complete(worker.requests.find(row => row.bot)!, reply);
+  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 3000 });
+  useComputer.getState().playPremove();
+  expect(useWorkspace.getState().game.cursor).toBe(finalPly);
+  expect(useComputer.getState().premove).toBeNull();
+  if (finalPly === 2) expect(chessAt(useWorkspace.getState().game).get("a8")).toMatchObject({ type: "n", color: "w" });
+});
+it("clears a queued premove when leaving or resigning", async () => {
+  vi.spyOn(useReviewDialog.getState(), "opening").mockResolvedValue();
+  await useComputer.getState().start(BOTS[0], "black", false, () => 0);
+  useComputer.getState().queuePremove("g8", "f6"); useComputer.getState().exit();
+  expect(useComputer.getState().premove).toBeNull();
+  await useComputer.getState().start(BOTS[0], "black", false, () => 0);
+  useComputer.getState().queuePremove("g8", "f6"); useComputer.getState().resign();
+  expect(useComputer.getState().premove).toBeNull();
+  await vi.waitFor(() => expect(useComputer.getState().active).toBe(false));
+});
 it("collects unrestricted positions even with assistance off, grading only human moves", async () => {
   worker.autoReview = true;
   await useComputer.getState().start(BOTS[0], "white", false, () => 0);

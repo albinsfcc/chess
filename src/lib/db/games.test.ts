@@ -43,6 +43,19 @@ describe("IndexedDB games repository", () => {
     await expect(repository.get(document.game.id)).rejects.toThrow("no longer");
   });
 
+  it("clears every library page and game-owned analysis while preserving profiles and shared cache", async () => {
+    const template = (await validatePgn(annotatedPgn)).validGames[0];
+    await repository.save(Array.from({ length: 30 }, (_, index) => ({ ...template, game: { ...template.game, id: crypto.randomUUID(), normalizedPgnHash: index.toString(16).padStart(64, "0") } })));
+    for (const name of ["gameAnalyses", "positionAnalyses", "computerPositions", "profiles"]) await db.table(name).put({ id: "fixture", gameId: template.game.id });
+    await db.table("analyses").put({ key: "shared-cache" });
+    expect((await repository.page()).total).toBe(30);
+    await repository.clearGames();
+    expect(await repository.page(1)).toEqual({ games: [], total: 0, page: 0 });
+    for (const name of ["trees", "gameAnalyses", "positionAnalyses", "computerPositions"]) expect(await db.table(name).count()).toBe(0);
+    expect(await db.profiles.count()).toBe(1);
+    expect(await db.analyses.count()).toBe(1);
+  });
+
   it("rolls back the game write when saving its tree fails", async () => {
     const document = (await validatePgn(annotatedPgn)).validGames[0];
     await db.trees.add({ gameId: document.game.id, tree: document.tree });

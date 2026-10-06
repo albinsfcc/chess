@@ -14,6 +14,45 @@ test.beforeEach(async ({ page }) => {
 });
 let worker: string;
 test.beforeAll(async () => { worker = (await build({ entryPoints: ["tests/fixtures/computer-worker.ts"], bundle: true, write: false, format: "iife", platform: "browser" })).outputFiles[0].text; });
+
+test("right-click circles and right-drag arrows toggle and clear when a move is made", async ({ page }) => {
+  await page.goto("/");
+  const board = page.getByTestId("chessboard"), e4 = page.getByTestId("square-e4"), e2 = page.getByTestId("square-e2");
+  await e4.click({ button: "right" }); await expect(e4).toHaveAttribute("data-annotated", "true");
+  await e4.click({ button: "right" }); await expect(board).toHaveAttribute("data-circle-count", "0");
+  const from = await e2.boundingBox(), to = await e4.boundingBox();
+  for (const expected of ["1", "0", "1"]) {
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 8 });
+    await page.mouse.up({ button: "right" });
+    await expect(board).toHaveAttribute("data-user-arrow-count", expected);
+    await expect(board).toHaveAttribute("data-circle-count", "0");
+  }
+  await e2.click(); await e4.click();
+  await expect(board).toHaveAttribute("data-user-arrow-count", "0");
+  await expect(e4).toHaveAttribute("aria-label", "e4, White pawn");
+});
+
+test("queues a Black premove during the bot turn and plays it after the animated reply", async ({ page }) => {
+  await page.route("**/engines/analysis-worker.js", route => route.fulfill({ contentType: "application/javascript", body: worker }));
+  await page.goto("/"); await page.evaluate(() => { Math.random = () => .25; });
+  await page.getByRole("button", { name: "Play Computer", exact: true }).click();
+  await page.getByRole("radio", { name: "Black", exact: true }).check();
+  await page.getByLabel("Show move feedback").uncheck();
+  await page.getByRole("button", { name: "Start Game", exact: true }).click();
+  await page.getByTestId("square-g8").click(); await page.getByTestId("square-f6").click();
+  await expect(page.getByTestId("chessboard")).toHaveAttribute("data-premove", "g8f6");
+  await expect(page.getByTestId("square-g8")).toHaveAttribute("aria-label", "g8, Black knight");
+  await page.getByRole("button", { name: "Cancel premove", exact: true }).click();
+  await expect(page.getByTestId("chessboard")).not.toHaveAttribute("data-premove", "g8f6");
+  const from = await page.getByTestId("square-g8").boundingBox(), to = await page.getByTestId("square-f6").boundingBox();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down(); await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 10 }); await page.mouse.up();
+  await expect(page.getByTestId("chessboard")).toHaveAttribute("data-premove", "g8f6");
+  await expect(page.getByTestId("square-f6")).toHaveAttribute("aria-label", "f6, Black knight");
+  await expect(page.getByTestId("chessboard")).not.toHaveAttribute("data-premove", "g8f6");
+});
 test("computer terminal move opens the shared review with accuracy, move details and persistence", async ({ page }) => {
   await page.route("**/engines/analysis-worker.js", (route) => route.fulfill({ contentType: "application/javascript", body: worker }));
   await page.goto("/"); await page.getByRole("button", { name: "Play Computer", exact: true }).click();
@@ -35,6 +74,14 @@ test("computer terminal move opens the shared review with accuracy, move details
   await expect(page.getByRole("button", { name: "Start review", exact: true })).toBeVisible({ timeout: 20000 });
   await expect(page.getByRole("dialog").getByLabel("White accuracy", { exact: true })).toHaveText(/\d+\.\d/);
   await expect(page.getByRole("dialog").getByLabel("Black accuracy", { exact: true })).toHaveText(/\d+\.\d/);
+  const modal = page.getByRole("dialog");
+  const layout = await modal.evaluate(el => {
+    const box = el.getBoundingClientRect(), header = el.querySelector('.review-dialog-header')!.getBoundingClientRect(), title = el.querySelector('[data-slot="dialog-title"]')!.getBoundingClientRect();
+    return { inset: title.top - header.top, height: box.height, viewport: innerHeight, overflow: el.scrollWidth > el.clientWidth, blur: getComputedStyle(document.querySelector('[data-slot="dialog-overlay"]')!).backdropFilter };
+  });
+  expect(layout.inset).toBeGreaterThan(12); expect(layout.height).toBeLessThan(layout.viewport);
+  expect(layout.overflow).toBe(false); expect(layout.blur).toContain("blur(12px)");
+  await page.screenshot({ path: `artifacts/review-modal-${page.viewportSize()?.width}.png` });
   const searches = await page.evaluate(() => (window as unknown as { computerSearches: { fen: string; bot?: unknown }[] }).computerSearches);
   const reviewSearches = searches.filter(row => !row.bot);
   // A quick human move can cancel and restart an unfinished position search.
@@ -44,14 +91,14 @@ test("computer terminal move opens the shared review with accuracy, move details
   await page.getByRole("button", { name: "Start review", exact: true }).click();
   await expect(page.getByRole("region", { name: "Game review card", exact: true })).toContainText("4 / 4 moves graded");
   expect(await page.evaluate(() => (window as unknown as { computerSearches: unknown[] }).computerSearches.length)).toBe(countAtReview);
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("4");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 4\b/ }).click();
   await expect(page.getByTestId("square-h4")).toHaveAttribute("aria-label", "h4, Black queen");
   await page.getByRole("tab", { name: "Engine", exact: true }).click();
   await expect(page.getByLabel("Played move evaluation", { exact: true })).toContainText("Qh4#");
   await expect(page.getByLabel("Played move evaluation", { exact: true })).toContainText(/Before:.*After:/);
   await expect(page.getByLabel("Move assessment", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Moves", exact: true }).click();
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("1");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 1\b/ }).click();
   await page.getByRole("tab", { name: "Engine", exact: true }).click();
   await expect(page.getByLabel("Saved principal variations", { exact: true }).locator("li")).not.toHaveCount(0);
   const saved = await page.evaluate(() => new Promise<{ source: string; result: string; black: string; details: number }>((resolve) => {

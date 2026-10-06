@@ -1,4 +1,5 @@
 "use client";
+import { GlassSelect } from "./ui/glass-select";
 
 import { useMemo, useRef, useState } from "react";
 import { ArrowDownToLine } from "lucide-react";
@@ -96,7 +97,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
           <legend className="px-1 text-sm font-medium">Discovery range</legend>
           {platform === "chesscom" ? <>
             <p className="text-xs text-muted-foreground">{state.months.length ? `Available archives: ${state.months[0]} through ${state.months.at(-1)}. Months are fetched one at a time.` : "No archive months loaded. Refresh Games to check again."}</p>
-            <div className="grid grid-cols-2 gap-3">{([["From month", oldest, setFromMonth], ["To month", newest, setToMonth]] as const).map(([label, value, update]) => <label key={label} className="text-sm">{label}<select aria-label={label} className={`${fieldClass} mt-1`} value={value} onChange={(event) => update(event.target.value)}><option value="">All available</option>{[...new Set([...state.months, value].filter(Boolean))].sort().map((month) => <option key={month}>{month}</option>)}</select></label>)}</div>
+            <div className="grid grid-cols-2 gap-3">{([["From month", oldest, setFromMonth], ["To month", newest, setToMonth]] as const).map(([label, value, update]) => <label key={label} className="text-sm">{label}<GlassSelect aria-label={label} className={`${fieldClass} mt-1`} value={value} onValueChange={(value) => update(value)}><option value="">All available</option>{[...new Set([...state.months, value].filter(Boolean))].sort().map((month) => <option key={month}>{month}</option>)}</GlassSelect></label>)}</div>
           </> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label className="text-sm">Since<input aria-label="Discover since" className={`${fieldClass} mt-1`} type="date" min="2013-01-02" value={since} onChange={(event) => setSince(event.target.value)} /></label>
             <label className="text-sm">Until<input aria-label="Discover until" className={`${fieldClass} mt-1`} type="date" min="2013-01-02" value={until} onChange={(event) => setUntil(event.target.value)} /></label>
@@ -117,7 +118,7 @@ export function PlatformImportDialog({ platform }: { platform: Platform }) {
             ["timeCategory", "Time category", [["all", "All categories"], ...[...new Set(state.rows.map((row) => row.document.game.timeCategory ?? "unknown"))].map((value) => [value, value])]],
             ["rated", "Rated/casual", [["all", "All games"], ["rated", "Rated"], ["casual", "Casual"]]],
             ["imported", "Import status", [["all", "All statuses"], ["new", "Not imported"], ["imported", "Already imported"]]],
-          ] as const).map(([key, label, options]) => <label key={key} className="text-sm">{label}<select aria-label={label} className={`${fieldClass} mt-1`} value={filters[key]} onChange={(event) => changeFilter(key, event.target.value)}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}
+          ] as const).map(([key, label, options]) => <label key={key} className="text-sm">{label}<GlassSelect aria-label={label} className={`${fieldClass} mt-1`} value={filters[key]} onValueChange={(value) => changeFilter(key, value)}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</GlassSelect></label>)}
         </fieldset>
         </details>
         {state.busy === "fetch" && <div role="status" aria-label="Loading recent games" className="space-y-2"><span className="sr-only">Loading games</span>{Array.from({ length: preferences.initialCount }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />)}</div>}

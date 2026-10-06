@@ -1,11 +1,12 @@
 "use client";
 
+import { useFocusMode } from "./use-focus-mode";
 import { ComputerGame, ComputerAssistance } from "./computer-game";
 import { useComputer } from "@/store/computer";
 import dynamic from "next/dynamic";
 import { SoundEffects } from "./sound-effects";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, ChevronFirst, ChevronLast, Crown, FlipVertical2, LockKeyhole, RotateCcw } from "lucide-react";
+import { Maximize2, Minimize2, ArrowLeft, ArrowRight, ChevronFirst, ChevronLast, Crown, FlipVertical2, LockKeyhole, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { gameStatus } from "@/lib/game";
@@ -34,6 +35,7 @@ const GameBoard = dynamic(() => import("@/components/game-board").then((module) 
 });
 
 export function Workspace() {
+  const { focused, toggle: toggleFocus } = useFocusMode();
   const computerSession = useComputer();
   const computer = computerSession.active;
   const [section, setSection] = useState<InspectorSection>("moves");
@@ -76,7 +78,7 @@ export function Workspace() {
   }, []);
 
   return (
-    <div className="workspace-shell min-h-screen">
+    <div className="workspace-shell min-h-screen" data-focus={focused}>
       <header className="workspace-header">
         <SoundEffects />
         <div className="mx-auto flex max-w-[1920px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -85,7 +87,7 @@ export function Workspace() {
             <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><h1 className="text-xs tracking-wide text-muted-foreground">Workspace</h1></div>
           </div>
           <div className="frost-toolbar flex flex-wrap items-center gap-2" aria-label="Import actions">
-            <ComputerGame />
+            <Button className="focus-toggle" variant="outline" title={focused ? "Exit focus" : "Focus mode"} aria-label={focused ? "Exit focus" : "Focus mode"} aria-pressed={focused} onClick={toggleFocus}>{focused ? <Minimize2 /> : <Maximize2 />}<span className="focus-label">{focused ? "Exit focus" : "Focus mode"}</span></Button><ComputerGame />
             {!computer && <><PlatformImportDialog platform="chesscom" /><PlatformImportDialog platform="lichess" /><PgnImportDialog /></>}
             <GameLibraryDialog disabled={computer} onOpen={() => setSection("moves")} /><SettingsDialog />
           </div>
@@ -103,24 +105,22 @@ export function Workspace() {
                 <span className="text-xs text-muted-foreground">Standard chess</span>
                 <p role="status" data-testid="game-status" className={`text-sm font-medium ${chess.isCheck() ? "text-rose-300" : "text-primary"}`}>{status}</p>
               </div>
-              {!computer && <div data-board-chrome data-testid="board-navigation" className="board-toolbar mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2">
-                <div className="flex gap-1">
+              {!computer && <div data-board-chrome data-testid="board-navigation" className="board-toolbar board-navigation mt-2 rounded-xl border p-2">
+                <div className="board-mode-control">{imported ? <Button variant="outline" onClick={closeGame}>Free play</Button> : <Button variant="outline" disabled={!game.moves.length} onClick={reset}><RotateCcw /> Reset</Button>}</div>
+                <div className="board-history-controls" aria-label="Position navigation">
                   <Button variant="ghost" size="icon" aria-label={imported ? "First position" : "Go to start"} disabled={game.cursor === 0} onClick={() => goTo(0)}><ChevronFirst /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Previous move" : "Undo move"} disabled={game.cursor === 0} onClick={() => goTo(game.cursor - 1)}><ArrowLeft /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Next move" : "Redo move"} disabled={game.cursor === game.moves.length} onClick={() => goTo(game.cursor + 1)}><ArrowRight /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Last move" : "Go to latest move"} disabled={game.cursor === game.moves.length} onClick={() => goTo(game.moves.length)}><ChevronLast /></Button>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" onClick={flip}><FlipVertical2 /> Flip</Button>
-                  {imported ? <Button variant="ghost" onClick={closeGame}>Free play</Button> : <Button variant="ghost" disabled={!game.moves.length} onClick={reset}><RotateCcw /> Reset</Button>}
-                </div>
+                <Button className="board-flip-control" variant="outline" onClick={flip}><FlipVertical2 /> Flip</Button>
               </div>}
             </div>
           </section>
 
           <aside className="workspace-panels grid min-w-0 grid-cols-1 gap-4" aria-label="Game workspace panels" tabIndex={0}>
-            <WorkspaceInspector value={section} onChange={setSection} actions={<GameAnalysisDialog onReviewStart={() => setSection("moves")} />} panels={{ moves: <>
-            {computer ? section === "moves" && <ComputerAssistance /> : <ReviewSummaryCard />}
+            <WorkspaceInspector value={focused ? "moves" : section} onChange={setSection} actions={<GameAnalysisDialog onReviewStart={() => setSection("moves")} />} panels={{ moves: <>
+            {!focused && (computer ? section === "moves" && <ComputerAssistance /> : <ReviewSummaryCard />)}
             {imported ? <ImportedGameViewer /> : <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
               <div className="flex items-center justify-between border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves</h2><span className="font-mono text-xs text-muted-foreground">{game.cursor} / {game.moves.length} ply</span></div>
               {!game.moves.length ? (

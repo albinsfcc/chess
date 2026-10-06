@@ -10,14 +10,15 @@ import { useWorkspace } from "@/store/workspace";
 import { platformName } from "@/lib/platforms/domain";
 
 export function GameLibrary({ onOpen }: { onOpen?: () => void }) {
-  const { games, status, error, busyId, refresh, open, remove, page, total, setPage } = useLibrary();
+  const { games, status, error, busyId, refresh, open, remove, clearAll, page, total, setPage } = useLibrary();
   const activeId = useWorkspace((state) => state.imported?.game.id);
   const [deleting, setDeleting] = useState<GameRecord | null>(null);
+  const [clearing, setClearing] = useState(false);
   useEffect(() => { void refresh(); }, [refresh]);
 
   return <section className="min-w-0 rounded-xl border bg-card" aria-labelledby="games-heading">
     <div className="flex items-center justify-between border-b px-5 py-4"><h2 id="games-heading" className="font-semibold">Game library</h2>
-      <Button variant="ghost" size="icon" aria-label="Refresh library" disabled={status === "loading" || !!busyId} onClick={() => void refresh()}><RefreshCw size={16} /></Button>
+      <div className="flex items-center gap-1"><Button variant="ghost" size="sm" disabled={!total || status === "loading" || !!busyId} onClick={() => setClearing(true)}><Trash2 size={14} />Clear all</Button><Button variant="ghost" size="icon" aria-label="Refresh library" disabled={status === "loading" || !!busyId} onClick={() => void refresh()}><RefreshCw size={16} /></Button></div>
     </div>
     <p className="px-5 pt-3 text-xs text-muted-foreground">Most recent played first · saved on this device</p>
     {(status === "idle" || status === "loading") && <p role="status" className="px-5 py-6 text-sm text-muted-foreground">Loading your games…</p>}
@@ -39,6 +40,13 @@ export function GameLibrary({ onOpen }: { onOpen?: () => void }) {
       <span role="status" className="text-xs">Page {page + 1} of {Math.ceil(total / 25)} · {total} games</span>
       <Button variant="outline" disabled={(page + 1) * 25 >= total || status === "loading"} onClick={() => void setPage(page + 1)}>Next games</Button>
     </nav>}
+    <Dialog open={clearing} onOpenChange={value => { if (!busyId) setClearing(value); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Clear all games?</DialogTitle><DialogDescription>Delete all {total} saved games across every page, including their PGNs, variations and game reviews? This cannot be undone. Your settings and saved profiles will be kept.</DialogDescription></DialogHeader>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button autoFocus variant="outline" disabled={!!busyId} onClick={() => setClearing(false)}>Cancel</Button><Button variant="destructive" disabled={!!busyId} onClick={async () => { if (await clearAll()) setClearing(false); }}>{busyId === "all" ? "Clearing?" : "Clear all games"}</Button></div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={!!deleting} onOpenChange={(value) => { if (!value && !busyId) setDeleting(null); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Delete this game?</DialogTitle><DialogDescription>{deleting?.white} vs {deleting?.black} will be removed from this device, including its saved PGN, variations and game analysis sessions.</DialogDescription></DialogHeader>

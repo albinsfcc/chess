@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { BOTS, botDelayMs, cancellableDelay, chooseBotMove, chooseOpeningMove, computerResult, FEEDBACK_HOLD_MS, OPENING_MULTI_PV, OPENING_VARIETY_PLIES, humanColor, type BotProfile, type Side } from "@/lib/computer";
+import { BOTS, botDelayMs, cancellableDelay, chooseBotMove, computerResult, FEEDBACK_HOLD_MS, OPENING_MULTI_PV, OPENING_VARIETY_PLIES, humanColor, type BotProfile, type Side } from "@/lib/computer";
 import { chessAt, createGame, tryMove, type PromotionPiece, type GameState } from "@/lib/game";
 import { engineClient } from "@/lib/engine/client";
 import { ENGINE_BUILD, type AnalysisConfig, type EngineResult } from "@/lib/engine/domain";
@@ -18,9 +18,14 @@ import { useReviewDialog } from "./game-review";
 import { useThreats } from "./threats";
 import { useLibrary } from "./library";
 import { useOpenings } from "./openings";
+import { canQueuePremove, type Premove } from "@/lib/computer";
 
 export type HumanFeedback = { assessment: MoveAssessment; bestMove: string | null; change: ReturnType<typeof evaluationChange> };
 type State = {
+  premove: Premove | null;
+  queuePremove: (from: string, to: string, promotion?: PromotionPiece) => boolean;
+  cancelPremove: () => void;
+  playPremove: () => void;
   showFeedback: boolean; feedback: Record<number, HumanFeedback>; feedbackPly: number | null; positions: Record<number, EngineResult>; reviewConfig: AnalysisConfig;
   active: boolean; starting: boolean; assisted: boolean; thinking: boolean; reviewingMove: boolean; error: string | null;
   bot: BotProfile; human: "w" | "b"; result: string | null; id: string | null;
@@ -47,7 +52,7 @@ async function finish(resigned?: "w" | "b", termination = "normal") {
   const result = computerResult(chess, resigned) ?? state.result;
   if (!result) return;
   cancel(); clearTimeout(feedbackTimer); const token = generation;
-  useComputer.setState({ result, thinking: false, reviewingMove: false });
+  useComputer.setState({ result, thinking: false, reviewingMove: false, premove: null });
   useWorkspace.setState({ computer: { human: state.human, locked: true } });
   chess.header("Event", `Computer game ${state.id}`, "Site", "Local", "Date", new Date().toISOString().slice(0, 10).replaceAll("-", "."),
     "White", state.human === "w" ? "Human" : state.bot.name, "Black", state.human === "b" ? "Human" : state.bot.name,
@@ -132,6 +137,7 @@ function schedule() {
   if (!state.active) return;
   if (state.result || computerResult(chessAt(useWorkspace.getState().game))) { void finish(); return; }
   const botTurn = chessAt(useWorkspace.getState().game).turn() !== state.human;
+  if (botTurn) useComputer.setState({ premove: null });
   const reviewingMove = botTurn && state.showFeedback && useWorkspace.getState().game.cursor > 0;
   useComputer.setState({ thinking: botTurn && !reviewingMove, reviewingMove, error: null });
   useWorkspace.setState({ computer: { human: state.human, locked: botTurn } });
@@ -165,7 +171,7 @@ async function search(token: number, botTurn: boolean) {
       const opening = game.cursor < OPENING_VARIETY_PLIES;
       const result = await client.analyze(fen, { preset: "deep", multiPv: opening ? Math.max(OPENING_MULTI_PV, state.bot.multiPv) : state.bot.multiPv }, "computer", state.bot.search);
       if (!current()) return;
-      const move = (opening ? chooseOpeningMove(chess, result, state.bot, randomMove) : null) ?? chooseBotMove(chess, result, state.bot, randomMove);
+      const move = chooseBotMove(chess, result, state.bot, randomMove, opening);
       await collectPositions(game, token); if (!current()) return;
       await delay.promise; if (!current()) return;
       const next = tryMove(game, move.slice(0, 2), move.slice(2, 4), move[4] as PromotionPiece | undefined);
@@ -174,10 +180,25 @@ async function search(token: number, botTurn: boolean) {
       useWorkspace.setState({ game: next.game, boardTransition: "navigate" });
     } else { await collectPositions(game, token); if (current()) publishAssistance(); }
   } catch (error) {
-    if (current()) { cancelDelay?.(); useComputer.setState({ thinking: false, reviewingMove: false, error: error instanceof Error ? error.message : "Stockfish failed. Retry to continue." }); clearAnalysis(); }
+    if (current()) { cancelDelay?.(); useComputer.setState({ thinking: false, reviewingMove: false, premove: null, error: error instanceof Error ? error.message : "Stockfish failed. Retry to continue." }); clearAnalysis(); }
   }
 }
 export const useComputer = create<State>((set, get) => ({
+  premove: null,
+  queuePremove: (from, to, promotion) => {
+    const state = get(), game = useWorkspace.getState().game, chess = chessAt(game);
+    if (!state.active || state.result || state.error || chess.turn() === state.human || chess.isGameOver() || !canQueuePremove(chess, state.human, from, to)) return false;
+    const promotes = chess.get(from as import("chess.js").Square)?.type === "p" && to[1] === (state.human === "w" ? "8" : "1");
+    set({ premove: { from, to, ...(promotes ? { promotion: promotion ?? "q" } : {}), afterPly: game.cursor + 1 } });
+    return true;
+  },
+  cancelPremove: () => set({ premove: null }),
+  playPremove: () => {
+    const state = get(), workspace = useWorkspace.getState(), queued = state.premove;
+    if (!queued || !state.active || state.result || state.error || workspace.computer?.locked || chessAt(workspace.game).turn() !== state.human) return;
+    set({ premove: null }); // Consume before applying; repeated renders cannot replay it.
+    if (workspace.game.cursor === queued.afterPly) workspace.move(queued.from, queued.to, queued.promotion);
+  },
   showFeedback: true, feedback: {}, feedbackPly: null, positions: {}, reviewConfig: { preset: "standard", multiPv: 3 },
   active: false, starting: false, assisted: false, thinking: false, reviewingMove: false, error: null, bot: BOTS[0], human: "w", result: null, id: null,
   start: async (bot, side, assisted = false, random = Math.random, showFeedback = true) => {
@@ -192,7 +213,7 @@ export const useComputer = create<State>((set, get) => ({
       snapshot ??= { game: w.game, imported: w.imported, freeGame: w.freeGame, selectedPath: w.selectedPath, navigationPaths: w.navigationPaths, orientation: w.orientation };
       const human = humanColor(side, random); randomMove = random; endingReason = "normal";
       const { preset, multiPv } = useAnalysis.getState().preferences;
-      set({ active: true, bot, human, assisted, showFeedback, feedback: {}, feedbackPly: null, positions: {}, reviewConfig: { preset, multiPv }, result: null, id: crypto.randomUUID() });
+      set({ active: true, bot, human, assisted, showFeedback, premove: null, feedback: {}, feedbackPly: null, positions: {}, reviewConfig: { preset, multiPv }, result: null, id: crypto.randomUUID() });
       useWorkspace.setState({ computer: { human, locked: human === "b" }, game: createGame(), imported: null, freeGame: null, selectedPath: [], navigationPaths: [], orientation: human === "w" ? "white" : "black", boardTransition: "replace", boardEpoch: w.boardEpoch + 1 });
       unsubscribe = useWorkspace.subscribe((next, previous) => { if (next.game !== previous.game) schedule(); });
       schedule();
@@ -204,7 +225,7 @@ export const useComputer = create<State>((set, get) => ({
   retry: () => { if (get().result) void finish(); else schedule(); },
   resign: () => { if (get().active && !get().result) void finish(get().human, "resignation"); },
   exit: () => {
-    unlockEngine(); clearTimeout(feedbackTimer); set({ feedbackPly: null, active: false, assisted: false, thinking: false, reviewingMove: false, result: null, error: null });
+    unlockEngine(); clearTimeout(feedbackTimer); set({ premove: null, feedbackPly: null, active: false, assisted: false, thinking: false, reviewingMove: false, result: null, error: null });
     useReviewDialog.getState().close();
     useWorkspace.setState({ ...snapshot, computer: null, boardTransition: "replace", boardEpoch: useWorkspace.getState().boardEpoch + 1 }); snapshot = undefined;
   },

@@ -33,7 +33,7 @@ test("full-game queue pauses, reloads, resumes, navigates the graph and exports 
   await page.getByRole("button", { name: "Close and pause", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toContainText("paused");
   const progress = await page.getByTestId("queue-progress").textContent();
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("4");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 4\b/ }).click();
   await expect(page.getByLabel("Saved position analysis")).toContainText("not analyzed");
   await expect(page.getByTestId("square-c6")).toHaveAttribute("aria-label", "c6, Black knight");
   await page.reload();
@@ -41,7 +41,7 @@ test("full-game queue pauses, reloads, resumes, navigates the graph and exports 
   await expect(page.getByTestId("queue-progress")).toHaveText(progress!);
   await page.getByRole("button", { name: "Resume queue", exact: true }).click();
   await expect(page.getByTestId("queue-progress")).toHaveText("5 / 5 positions · completed", { timeout: 15_000 });
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("1");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 1\b/ }).click();
   await expect(page.getByTestId("square-e4")).toHaveAttribute("aria-label", "e4, White pawn");
   await expect(page.getByRole("button", { name: "Main line 1. e4", exact: true })).toHaveAttribute("aria-current", "step");
   await expect(page.getByLabel("Played move evaluation")).toContainText("Played move: e4");
@@ -77,14 +77,14 @@ test("cancelled queues resume, and selected recursive variations retain separate
   await page.getByRole("button", { name: "Variation 1... Nf6", exact: true }).click();
   await start(page, true);
   await expect(page.getByTestId("queue-progress")).toHaveText("3 / 3 positions · completed", { timeout: 15_000 });
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("2");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 2\b/ }).click();
   await expect(page.getByTestId("square-f6")).toHaveAttribute("aria-label", "f6, Black knight");
   await expect(page.getByTestId("square-d4")).toHaveAttribute("aria-label", "d4, White pawn");
   await page.getByRole("button", { name: "Return to main line", exact: true }).click();
-  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Main line · standard / 3 PV · 5/5 · completed" });
+  await page.getByLabel("Saved analysis", { exact: true }).click(); await page.getByRole("option", { name: "Main line · standard / 3 PV · 5/5 · completed", exact: true }).click();
   await expect(page.getByLabel("Saved position analysis")).toContainText("Depth 12");
-  await page.getByLabel("Saved analysis", { exact: true }).selectOption({ label: "Variation 0.0.1.0 · standard / 3 PV · 3/3 · completed" });
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("2");
+  await page.getByLabel("Saved analysis", { exact: true }).click(); await page.getByRole("option", { name: "Variation 0.0.1.0 · standard / 3 PV · 3/3 · completed", exact: true }).click();
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 2\b/ }).click();
   await expect(page.getByLabel("Saved position analysis")).toContainText("After 1... Nf6");
 });
 test("refresh during a running queue offers recovery without claiming background computation", async ({ page }) => {

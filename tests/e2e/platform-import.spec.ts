@@ -39,12 +39,12 @@ for (const platform of ["Chess.com", "Lichess"]) {
     await expect(page.getByRole("checkbox", { name: "Select Alice vs Bob", exact: true })).toBeEnabled();
     await expect(page.getByLabel("Discovered games")).toContainText("Alice (1500) vs Bob (1450)");
     await page.getByText("More games / Filters", { exact: true }).click();
-    await page.getByLabel("Rated/casual", { exact: true }).selectOption("rated");
+    await page.getByLabel("Rated/casual", { exact: true }).click(); await page.getByRole("option", { name: "Rated", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: "Select Carol vs Bob", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Select visible", exact: true }).click();
     await page.getByRole("button", { name: "Import selected", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "1 imported" })).toBeVisible();
-    await page.getByLabel("Rated/casual", { exact: true }).selectOption("all");
+    await page.getByLabel("Rated/casual", { exact: true }).click(); await page.getByRole("option", { name: "All games", exact: true }).click();
     await page.getByRole("button", { name: "Refresh Games", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: "Select Alice vs Bob", exact: true })).toBeDisabled();
     await expect(page.getByText("Already imported", { exact: true }).last()).toBeVisible();

@@ -2,7 +2,10 @@
 
 import { usePieceSet } from "./piece-set";
 import { squareAppearance, WOODEN_COLORS, WOOD_GRAIN } from "@/lib/board-appearance";
-import { Settings2 } from "lucide-react";
+import { BOARD_TEXTURES } from "@/lib/board-textures";
+import { useBoardTexture, preloadBoardTexture } from "./use-board-texture";
+import { useTheme } from "@/store/theme";
+import { Settings2, Sun, Moon } from "lucide-react";
 import { useSound } from "@/store/sound";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
@@ -16,8 +19,10 @@ const DataSettings = dynamic(() => import("@/components/data-settings").then((mo
 
 export function SettingsDialog() {
   const sound = useSound();
+  const { theme, setTheme, blur, setBlur, error: themeError } = useTheme();
   const preferences = useWorkspace((state) => state.preferences);
   const previewPieces = usePieceSet(preferences.pieceSet);
+  const texture = useBoardTexture(preferences.boardTexture);
   const update = useWorkspace((state) => state.updatePreferences);
   const storageError = useWorkspace((state) => state.storageError);
   const boardPresets = [
@@ -51,13 +56,28 @@ export function SettingsDialog() {
         </DialogHeader>
         <div className="settings-body">
         <section className="settings-panel settings-appearance" aria-labelledby="appearance-heading">
-        <h3 id="appearance-heading" className="font-medium">Board & pieces</h3>
+        <h3 id="appearance-heading" className="font-medium">Appearance</h3>
+        <fieldset className="mb-5 space-y-2"><legend className="mb-2 text-sm font-medium">Colour mode</legend>
+          <div className="theme-options" aria-label="Colour mode">
+            <Button variant="outline" aria-pressed={theme === "light"} onClick={() => setTheme("light")}><Sun size={18} />Light</Button>
+            <Button variant="outline" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}><Moon size={18} />Dark</Button>
+          </div>
+          {themeError && <p role="status" className="text-xs text-destructive">{themeError}</p>}
+        </fieldset>
+        <div className="glass-blur-setting mb-5">
+          <label htmlFor="glass-blur" className="flex justify-between text-sm font-medium">Glass blur <output>{blur === 0 ? "Off" : `${blur} px`}</output></label>
+          <input id="glass-blur" type="range" min="0" max="40" step="1" value={blur} onChange={event => setBlur(Number(event.target.value))} className="mt-3 w-full" />
+          <p className="text-xs text-muted-foreground">Adjusts frosted surfaces in both themes. Changes preview instantly.</p>
+        </div>
+        <h3 className="mb-3 text-sm font-medium">Board & pieces</h3>
         <div className="settings-preview-row">
         <div className="space-y-3" aria-label="Board and pieces preview">
-          <div className="grid grid-cols-6 overflow-hidden rounded-lg border">{["bK", "bQ", "bR", "bB", "bN", "bP", "wK", "wQ", "wR", "wB", "wN", "wP"].map((code, index) => { const Piece = previewPieces[code]; return <div key={code} className="aspect-square" style={squareAppearance(preferences, (index + Math.floor(index / 6)) % 2 === 0)}><Piece /></div>; })}</div>
+          <div className="grid grid-cols-6 overflow-hidden rounded-lg border">{["bK", "bQ", "bR", "bB", "bN", "bP", "wK", "wQ", "wR", "wB", "wN", "wP"].map((code, index) => { const Piece = previewPieces[code]; return <div key={code} className="aspect-square" style={squareAppearance(preferences, (index + Math.floor(index / 6)) % 2 === 0, texture.asset)}><Piece /></div>; })}</div>
+          {texture.loading && <p role="status" className="text-xs text-muted-foreground">Loading wood texture…</p>}
+          {texture.failed && <p role="status" className="text-xs text-muted-foreground">Texture unavailable. Using matching square colours.</p>}
           <p className="text-xs text-muted-foreground">Live preview · changes apply immediately.</p>
         </div>
-        <fieldset className="space-y-2"><legend className="text-sm font-medium">Pieces</legend><div className="flex gap-2">{(["classic", "carved"] as const).map(pieceSet => <Button key={pieceSet} variant="outline" aria-pressed={preferences.pieceSet === pieceSet} onClick={() => update({ pieceSet })}>{pieceSet === "classic" ? "Classic" : "Carved"}</Button>)}</div><p className="text-xs text-muted-foreground">Carved: original Chess Review SVG artwork, <a className="underline" href="/pieces/carved/LICENSE.txt" target="_blank" rel="noreferrer">MIT licensed</a>.</p></fieldset>
+        <fieldset className="space-y-2"><legend className="text-sm font-medium">Pieces</legend><div className="flex flex-wrap gap-2">{(["classic", "carved", "sculpted", "soft-classic"] as const).map(pieceSet => <Button key={pieceSet} variant="outline" aria-pressed={preferences.pieceSet === pieceSet} onClick={() => update({ pieceSet })}>{pieceSet === "classic" ? "Classic" : pieceSet === "carved" ? "Carved" : pieceSet === "sculpted" ? "Sculpted Classic" : "Soft Classic"}</Button>)}</div><p className="text-xs text-muted-foreground">Carved, Sculpted Classic and Soft Classic: original Chess Review SVG artwork, <a className="underline" href="/pieces/carved/LICENSE.txt" target="_blank" rel="noreferrer">MIT licensed</a>.</p></fieldset>
         </div>
         <div className="space-y-5 py-3">
           {([
@@ -74,6 +94,17 @@ export function SettingsDialog() {
           ))}
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">Board colour presets</legend>
+
+            <div className="settings-presets grid grid-cols-2 gap-2" aria-label="Wooden board designs">
+              {BOARD_TEXTURES.map(({ id, name, asset, lightSquare, darkSquare }) => <Button key={id} type="button" variant="outline"
+                aria-pressed={preferences.boardTexture === id}
+                onPointerEnter={() => void preloadBoardTexture(asset)} onFocus={() => void preloadBoardTexture(asset)}
+                onClick={() => update({ boardTexture: id, lightSquare, darkSquare })}
+                className={`h-auto justify-start gap-2 whitespace-normal p-2 ${preferences.boardTexture === id ? "border-primary ring-1 ring-primary" : ""}`}>
+                <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded border" style={{ backgroundColor: lightSquare, backgroundImage: `url("${asset}"), conic-gradient(${lightSquare} 25%, ${darkSquare} 0 50%, ${lightSquare} 0 75%, ${darkSquare} 0)`, backgroundSize: "cover" }} />
+                <span className="text-left text-sm">{name}</span>
+              </Button>)}
+            </div>
 
             <div className="settings-presets grid grid-cols-2 gap-2">
               {boardPresets.map(({ name, lightSquare, darkSquare }) => {

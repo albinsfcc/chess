@@ -2,10 +2,8 @@
 import { visibleLines } from "@/lib/engine/alternatives";
 
 import { useComputer } from "@/store/computer";
-import { useState } from "react";
 import { Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatScore } from "@/lib/engine/normalize";
 import { PRESETS } from "@/lib/engine/domain";
 import { useAnalysis } from "@/store/analysis";
@@ -18,7 +16,6 @@ export function AnalysisPanel() {
   const computer = useComputer((state) => state.active);
   const reviewConfig = useComputer((state) => state.reviewConfig);
   const displayConfig = computer ? reviewConfig : analysis.preferences;
-  const [open, setOpen] = useState(false);
   const primary = analysis.result?.lines[0];
   return <section className="min-w-0 rounded-xl border bg-card p-5" aria-labelledby="analysis-heading">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -26,7 +23,7 @@ export function AnalysisPanel() {
       <span role="status" data-testid="engine-status" className="text-xs capitalize text-muted-foreground">{analysis.status}</span>
     </div>
     <p className="mt-3 text-xs text-muted-foreground">{analysis.version ?? "Stockfish 19 · local WASM"} · {displayConfig.preset} ({PRESETS[displayConfig.preset]} ms) · {displayConfig.multiPv} lines</p>
-    <p className="mt-2 text-xs text-muted-foreground">{computer || analysis.preferences.automatic ? "Assisted analysis" : "Free play"} · Evaluations favor White when positive.</p>
+    <p className="mt-2 text-xs text-muted-foreground">{computer ? "Assisted analysis" : analysis.enabled ? "Following every position" : "Analysis paused"} · Evaluations favor White when positive.</p>
     {analysis.result ? <div className="mt-4 space-y-3" aria-label="Current position analysis">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-mono text-2xl font-semibold text-primary" aria-label="Position evaluation">{primary ? `${primary.lowerBound ? "≥ " : primary.upperBound ? "≤ " : ""}${formatScore(primary.score)}` : "—"}</p>
@@ -42,23 +39,14 @@ export function AnalysisPanel() {
         </li>)}
       </ol>
       {primary?.nodes !== undefined && <p className="text-xs text-muted-foreground">{primary.nodes.toLocaleString()} nodes{primary.nodesPerSecond !== undefined ? ` · ${primary.nodesPerSecond.toLocaleString()} nodes/s` : ""}{primary.timeMs !== undefined ? ` · ${primary.timeMs} ms` : ""}</p>}
-    </div> : <p className="my-4 text-sm leading-relaxed text-muted-foreground">{analysis.status === "loading" ? "Loading the local engine. You can keep using the board." : analysis.status === "analyzing" ? "Analyzing this position…" : "Explore freely, analyze one position, or enable assistance after each move. The engine never moves your pieces."}</p>}
+    </div> : <p className="my-4 text-sm leading-relaxed text-muted-foreground">{analysis.status === "loading" ? "Loading the local engine. You can keep using the board." : analysis.status === "analyzing" ? "Analyzing this position…" : "Start analysis once to follow every move and variation automatically. Stop it whenever you want to explore without guidance."}</p>}
     {!computer && <ThreatPanel />}
     {analysis.assessment && <div className="mt-3 flex items-start gap-2 text-sm" title={analysis.assessment.reason}><MoveStrengthIcon label={analysis.assessment.label} className="size-7 shrink-0" /><p>Last move: <strong>{analysis.assessment.label}</strong><span className="block text-xs text-muted-foreground">{analysis.assessment.reason}</span></p></div>}
     {analysis.error && <p role="alert" className="my-3 text-sm text-destructive">{analysis.error}</p>}
     {analysis.storageError && <p role="alert" className="my-3 text-xs text-amber-200">{analysis.storageError}</p>}
     {!computer && <div className="mt-4 flex flex-wrap gap-2">
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild><Button variant="outline"><Activity /> Start analysis</Button></DialogTrigger>
-        <DialogContent><DialogHeader><DialogTitle>Choose your analysis mode</DialogTitle><DialogDescription>Analyze only the current position. You control the moves and navigation.</DialogDescription></DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-lg border p-4"><h3 className="font-medium">Free play</h3><p className="my-2 text-sm text-muted-foreground">Play legal moves without automatic recommendations. Analyze Position remains available.</p><Button variant="outline" onClick={() => { analysis.start(false); setOpen(false); }}>Use free play</Button></div>
-            <div className="rounded-lg border p-4"><h3 className="font-medium">Assisted analysis</h3><p className="my-2 text-sm text-muted-foreground">Analyze after each move or selected game position, with evaluation, variations and a best-move arrow.</p><Button onClick={() => { analysis.start(true); setOpen(false); }}>Use assisted analysis</Button></div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Button onClick={() => void analysis.analyze(true)}>Analyze Position</Button>
-      {analysis.enabled ? <Button variant="outline" onClick={analysis.stop}>Stop analysis</Button> : <Button variant="outline" onClick={() => void analysis.analyze()}>Resume analysis</Button>}
+      {analysis.enabled ? <Button variant="outline" onClick={analysis.stop}>Stop analysis</Button> : <Button onClick={() => analysis.start(true)}><Activity />Start analysis</Button>}
+      {analysis.enabled && <Button variant="outline" disabled={analysis.status === "loading" || analysis.status === "analyzing"} onClick={() => void analysis.analyze(true)}>Reanalyze position</Button>}
       <Button variant="ghost" disabled={analysis.status === "loading"} onClick={() => void analysis.restart()}>Restart engine</Button>
     </div>}
   </section>;

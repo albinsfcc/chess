@@ -6,10 +6,10 @@ const descriptions: Record<MoveLabel, string> = {
   Best: "The engine’s top choice with minimal evaluation loss.",
   Excellent: "A very strong alternative with little evaluation loss.",
   Good: "A sound move with a small evaluation loss.",
-  Inaccuracy: "A modest evaluation loss.", Mistake: "A substantial evaluation loss.", Blunder: "A large loss, or losing or allowing a forced mate.",
+  Inaccuracy: "A modest evaluation loss.", Mistake: "A substantial evaluation loss.", Blunder: "A healthy or winning position becomes clearly losing, including allowing forced mate.",
   Book: "A continuation listed in the local opening knowledge base.",
   Forced: "Exactly one legal move was available.",
-  Miss: "An opponent-created winning opportunity was lost, returning to equal or worse.",
+  Miss: "A forced win or substantially stronger winning continuation was missed, or an opponent-created opportunity was lost.",
   "Missed Win": "A legal mate in one was available, but this move did not deliver checkmate.",
 };
 export function MoveStrengthLegend() {

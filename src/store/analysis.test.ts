@@ -36,10 +36,11 @@ describe("analysis workspace coordination", () => {
     receive?.({ type: "ready", engineVersion: "Stockfish Test" }); receive?.({ type: "status", status: "ready" });
     expect(useAnalysis.getState()).toMatchObject({ enabled: false, status: "stopped", version: "Stockfish Test" });
   });
-  it("does not start the engine in free play or automatically after a manual one-position search", async () => {
+  it("follows new positions after starting analysis until explicitly stopped", async () => {
     useWorkspace.getState().move("e2", "e4"); expect(engineClient().ready).not.toHaveBeenCalled();
     await useAnalysis.getState().analyze(); expect(engineClient().analyze).toHaveBeenCalledOnce();
-    useWorkspace.getState().move("e7", "e5"); expect(engineClient().analyze).toHaveBeenCalledOnce(); expect(useAnalysis.getState().result).toBeNull();
+    useWorkspace.getState().move("e7", "e5"); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(2));
+    useAnalysis.getState().stop(); useWorkspace.getState().move("g1", "f3"); expect(engineClient().analyze).toHaveBeenCalledTimes(2);
   });
   it("analyzes completed moves and selected imported variations only when assisted", async () => {
     useAnalysis.getState().start(true); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(1));

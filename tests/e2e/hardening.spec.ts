@@ -59,7 +59,7 @@ test("backup validates, restores analysis and preferences, and clearing is expli
   await expect(page.getByRole("button", { name: "Restore validated backup", exact: true })).toHaveCount(0);
   await close(page); await page.reload(); await page.getByRole("button", { name: /Open Main line analysis/ }).first().click();
   await expect(page.getByTestId("queue-progress")).toContainText("5 / 5 positions");
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("2");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 2\b/ }).click();
   await expect(page.getByTestId("square-e5")).toHaveAttribute("aria-label", "e5, Black pawn");
 });
 
@@ -110,7 +110,7 @@ test("long move lists and evaluation histories expose bounded accessible pages",
   await expect(page.getByLabel("Navigate evaluation graph", { exact: true }).locator("option")).toHaveCount(100);
   await page.getByRole("button", { name: "Later positions", exact: true }).click();
   await expect(page.getByLabel("Navigate evaluation graph", { exact: true }).locator("option")).toHaveCount(21);
-  await page.getByLabel("Navigate evaluation graph", { exact: true }).selectOption("120");
+  await page.getByLabel("Navigate evaluation graph", { exact: true }).click(); await page.getByRole("option", { name: /^Ply 120\b/ }).click();
   await expect(page.getByRole("button", { name: "Main line 60... Ng8", exact: true })).toHaveAttribute("aria-current", "step");
   await expect(page.getByTestId("square-g8")).toHaveAttribute("aria-label", "g8, Black knight");
   await page.getByRole("button", { name: "Earlier positions", exact: true }).click();

@@ -121,3 +121,19 @@ it("rejects all four false Brilliant labels from the screenshot with recorded St
     expect(assessment?.label, quiet[i].move).not.toBe("Brilliant");
   }
 });
+
+it.each(["w", "b"] as const)("missed mate with a decisive advantage is a Miss for %s", side => {
+  const chess = new Chess(); if (side === "b") chess.move("e4");
+  const sign = side === "w" ? 1 : -1, played = side === "w" ? "d2d4" : "d7d5";
+  const before = result(chess.fen(), { type: "mate", moves: 5 * sign });
+  chess.move({ from: played.slice(0, 2), to: played.slice(2, 4) });
+  const after = result(chess.fen(), { type: "cp", value: 3066 * sign });
+  expect(classifyMove(before, after, played)?.label).toBe("Miss");
+  after.lines[0].score = { type: "cp", value: -300 * sign };
+  expect(classifyMove(before, after, played)?.label).toBe("Blunder");
+  before.lines[0].score = { type: "cp", value: 300 * sign };
+  expect(classifyMove(before, after, played)?.label).toBe("Blunder");
+  before.lines[0].score = { type: "mate", moves: 5 * sign };
+  after.lines[0].score = { type: "mate", moves: 8 * sign };
+  expect(classifyMove(before, after, played)?.label).toBe("Excellent");
+});

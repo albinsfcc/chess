@@ -104,6 +104,12 @@ export class GamesRepository {
       await this.db.computerPositions.where("gameId").equals(id).delete();
     });
   }
+  async clearGames(): Promise<void> {
+    const tables = [this.db.games, this.db.trees, this.db.gameAnalyses, this.db.positionAnalyses, this.db.computerPositions];
+    await this.db.transaction("rw", tables, async () => {
+      for (const table of tables) await table.clear();
+    });
+  }
 }
 
 let repository: GamesRepository | undefined;
