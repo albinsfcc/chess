@@ -43,6 +43,7 @@ beforeEach(async () => {
 afterEach(() => { useComputer.getState().exit(); client.terminate(); vi.restoreAllMocks(); });
 it("chooses delays at both boundaries and cancels a pending nonblocking timer", async () => {
   expect(botDelayMs(() => 0)).toBe(1000); expect(botDelayMs(() => 1)).toBe(10000); expect(botDelayMs(() => .5)).toBe(5500);
+  expect(botDelayMs(() => 0, true)).toBe(3000); expect(botDelayMs(() => 1, true)).toBe(3000);
   vi.useFakeTimers();
   try {
     const delay = cancellableDelay(10000), ready = vi.fn(); void delay.promise.then(ready);
@@ -60,7 +61,7 @@ it("queues one premove, applies it once after the bot reply, and supports cancel
   useComputer.getState().playPremove(); expect(useWorkspace.getState().game.cursor).toBe(0);
   await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true));
   worker.complete(worker.requests.find(row => row.bot)!, "e2e4");
-  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 3000 });
+  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 4000 });
   useComputer.getState().playPremove(); useComputer.getState().playPremove();
   expect(useWorkspace.getState().game.cursor).toBe(2);
   expect(chessAt(useWorkspace.getState().game).get("f6")).toMatchObject({ type: "n", color: "b" });
@@ -76,7 +77,7 @@ it.each([
   expect(useComputer.getState().queuePremove(from, to, "n")).toBe(true);
   await vi.waitFor(() => expect(worker.requests.some(row => row.bot)).toBe(true));
   worker.complete(worker.requests.find(row => row.bot)!, reply);
-  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 3000 });
+  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 4000 });
   useComputer.getState().playPremove();
   expect(useWorkspace.getState().game.cursor).toBe(finalPly);
   expect(useComputer.getState().premove).toBeNull();
@@ -111,7 +112,7 @@ it("collects unrestricted positions even with assistance off, grading only human
   worker.complete(worker.requests.find(row => row.bot)!, "e7e5");
   await vi.waitFor(() => expect(useComputer.getState().feedback[1]).toBeDefined());
   expect(useWorkspace.getState().game.cursor).toBe(1); // Result ready, minimum delay still pending.
-  await vi.waitFor(() => expect(useComputer.getState().positions[2]).toBeDefined(), { timeout: 3000 });
+  await vi.waitFor(() => expect(useComputer.getState().positions[2]).toBeDefined(), { timeout: 4000 });
   expect(useComputer.getState().feedback[2]).toBeUndefined();
   expect(useAnalysis.getState().result).toBeNull();
   const rows = await new ComputerProgressRepository().positions(useComputer.getState().id!);
@@ -158,7 +159,7 @@ it("defaults assistance off, locks Black until the opening bot move, and preserv
   expect(useComputer.getState().assisted).toBe(false); expect(useWorkspace.getState().orientation).toBe("black");
   expect(useWorkspace.getState().move("e2", "e4").kind).toBe("illegal");
   await vi.waitFor(() => expect(worker.requests).toHaveLength(1)); worker.complete(worker.requests[0], "e2e4");
-  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 3000 });
+  await vi.waitFor(() => expect(useWorkspace.getState().game.cursor).toBe(1), { timeout: 4000 });
   expect(useWorkspace.getState().move("e7", "e5").kind).toBe("moved");
   useWorkspace.getState().goTo(0); expect(useWorkspace.getState().game.cursor).toBe(2);
   useComputer.getState().exit(); expect(useWorkspace.getState().game.cursor).toBe(0);
@@ -200,7 +201,7 @@ it("automatically completes a terminal bot move and recovers from startup failur
   await vi.waitFor(() => expect(useComputer.getState().error).toContain("Startup failed"));
   expect(useWorkspace.getState().move("d8", "h4").kind).toBe("illegal"); useComputer.getState().retry();
   await vi.waitFor(() => expect(worker.requests).toHaveLength(2)); worker.complete(worker.requests[1], "d8h4");
-  await vi.waitFor(() => expect(opening).toHaveBeenCalledOnce(), { timeout: 3000 }); expect((await gamesRepository().list())[0].result).toBe("0-1");
+  await vi.waitFor(() => expect(opening).toHaveBeenCalledOnce(), { timeout: 4000 }); expect((await gamesRepository().list())[0].result).toBe("0-1");
 });
 
 

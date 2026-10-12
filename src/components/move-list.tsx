@@ -8,11 +8,13 @@ import type { GameNode } from "@/lib/pgn/domain";
 import { useGameAnalysis } from "@/store/game-analysis";
 import { assessmentMap } from "@/lib/game-analysis/move-quality";
 import { MoveStrengthIcon } from "./move-strength-icon";
+import { useAnalysis } from "@/store/analysis";
 import { useOpenings } from "@/store/openings";
 import { openingBookMoves, type OpeningEntry } from "@/lib/openings";
 const PAGE_SIZE = 50;
 export function MoveList({ nodes, variation = false }: { nodes: GameNode[]; variation?: boolean }) {
   const records = useGameAnalysis((state) => state.positions);
+  const liveAssessments = useAnalysis((state) => state.reviewAssessments);
   const openings = useOpenings((state) => state.index);
   const game = useWorkspace((state) => state.game), paths = useWorkspace((state) => state.navigationPaths);
   const gameId = useWorkspace((state) => state.imported?.game.id);
@@ -24,12 +26,16 @@ export function MoveList({ nodes, variation = false }: { nodes: GameNode[]; vari
   const bookMoves = useMemo(() => openings ? openingBookMoves(game.initialFen, game.moves, openings) : new Map<number, OpeningEntry>(), [game.initialFen, game.moves, openings]);
   const assessments = useMemo(() => {
     const result = assessmentMap(records, gameId, visiblePaths);
+    for (const path of visiblePaths) {
+      const live = liveAssessments[`${gameId}:${path}`];
+      if (live) result.set(path, live);
+    }
     for (const [ply, entry] of bookMoves) {
       const path = paths[ply]?.join(".");
       if (path && visiblePaths.has(path) && !result.has(path)) result.set(path, { label: "Book", reason: `Listed opening continuation: ${entry.name}.` });
     }
     return result;
-  }, [records, gameId, visiblePaths, bookMoves, paths]);
+  }, [records, gameId, visiblePaths, bookMoves, paths, liveAssessments]);
   return <>
     {rows.slice(offset, offset + PAGE_SIZE).map((group) => <div key={group.nodes[0].id} style={{ marginLeft: Math.min(group.depth, 3) * 6 }} className={`grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] items-start gap-1 py-1 ${group.depth ? "border-l-2 border-primary/30 pl-1" : ""}`} aria-label={group.depth ? `Variation level ${group.depth}` : "Main line"}>
       <span className="pt-2 font-mono text-xs text-muted-foreground">{group.moveNumber}.</span>

@@ -76,7 +76,8 @@ describe("transparent move labels", () => {
     const { before, after, played } = pair(0, "a1a7", "r3k3/8/8/8/8/8/8/R3K3 w - - 0 1");
     before.bestMove = played; before.lines[0].pvUci = [played, "a8a7"];
     expect(classifyMove(before, after, played)?.label).toBe("Brilliant");
-    before.lines[0].pvUci = [played]; expect(classifyMove(before, after, played)?.label).toBe("Best");
+    // The legal rook sacrifice still exists when the engine declines it.
+    before.lines[0].pvUci = [played]; expect(classifyMove(before, after, played)?.label).toBe("Brilliant");
   });
   it("grades shallow results provisionally but rejects bounded, stale or incompatible scores", () => {
     const { before, after, played } = pair(0);

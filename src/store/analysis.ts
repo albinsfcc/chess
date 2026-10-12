@@ -7,9 +7,11 @@ import { AnalysisRepository } from "@/lib/engine/repository";
 import { useWorkspace } from "./workspace";
 import { classifyMove, type MoveAssessment } from "@/lib/game-analysis/move-quality";
 import { bookContinuation } from "@/lib/openings";
+import { usableResult, withTerminalScore } from "@/lib/engine/result-quality";
 
 type AnalysisState = {
   assessment: MoveAssessment | null;
+  reviewAssessments: Record<string, MoveAssessment>;
   preferences: EnginePreferences; hydrated: boolean; enabled: boolean; status: EngineStatus; result: EngineResult | null;
   fen: string | null; error: string | null; storageError: string | null; version: string | null; cached: boolean;
   hydrate: () => void; updatePreferences: (patch: Partial<EnginePreferences>) => void;
@@ -17,16 +19,22 @@ type AnalysisState = {
   positionChanged: (newGame?: boolean) => void;
 };
 let serial = 0;
-async function assessLastMove(result: EngineResult, token: number) {
+async function assessLastMove(result: EngineResult, token: number, preparedBefore?: EngineResult | null) {
   const game = useWorkspace.getState().game;
   if (!game.cursor) return;
   try {
     const previous = chessAt({ ...game, cursor: game.cursor - 1 });
-    const before = await new AnalysisRepository().get(previous.fen(), result.engineVersion, result.config);
+    const before = preparedBefore ?? await new AnalysisRepository().get(previous.fen(), result.engineVersion, result.config);
     const move = game.moves[game.cursor - 1];
-    const previousResult = game.cursor > 1 ? await new AnalysisRepository().get(chessAt({ ...game, cursor: game.cursor - 2 }).fen(), result.engineVersion, result.config) : null;
+    const previousResult = game.cursor > 1 ? await new AnalysisRepository().get(chessAt({ ...game, cursor: game.cursor - 2 }).fen(), result.engineVersion, result.config).catch(() => null) : null;
     const uci = `${move.from}${move.to}${move.promotion ?? ""}`;
-    if (token === serial && before) useAnalysis.setState({ assessment: classifyMove(before, result, uci, { book: bookContinuation(before.fen, uci)?.name, previous: previousResult ?? undefined }) });
+    if (token === serial && before) {
+      const assessment = classifyMove(before, result, uci, { book: bookContinuation(before.fen, uci)?.name, previous: previousResult ?? undefined });
+      const workspace = useWorkspace.getState();
+      useAnalysis.setState(state => ({ assessment, ...(assessment && workspace.imported ? {
+        reviewAssessments: { ...state.reviewAssessments, [`${workspace.imported.game.id}:${workspace.selectedPath.join(".")}`]: assessment },
+      } : {}) }));
+    }
   } catch { /* Missing adjacent data leaves this move ungraded. */ }
 }
 function refreshThreats() {
@@ -41,6 +49,7 @@ function currentPosition() {
 }
 export const useAnalysis = create<AnalysisState>((set, get) => ({
   assessment: null,
+  reviewAssessments: {},
   preferences: { ...defaultEnginePreferences }, hydrated: false, enabled: false, status: "stopped", result: null, fen: null, error: null, storageError: null, version: null, cached: false,
   hydrate: () => {
     if (get().hydrated) return;
@@ -70,16 +79,33 @@ export const useAnalysis = create<AnalysisState>((set, get) => ({
       set({ fen, status: "loading" });
       const version = await client.ready(); if (token !== serial) return;
       set({ version });
+      // Reviewing an alternative requires both sides of the move, even when
+      // the parent was never analyzed with the current engine settings.
+      const workspace = useWorkspace.getState();
+      let before: EngineResult | null = null;
+      if (workspace.imported && workspace.game.cursor) {
+        const parentFen = chessAt({ ...workspace.game, cursor: workspace.game.cursor - 1 }).fen();
+        try { before = await new AnalysisRepository().get(parentFen, version, config); }
+        catch { set({ storageError: "Saved analysis is unavailable. Live analysis still works." }); }
+        if (token !== serial) return;
+        if (!before || !usableResult(before)) {
+          before = withTerminalScore(await client.analyze(parentFen, config));
+          if (token !== serial) return;
+          try { await new AnalysisRepository().save(before); }
+          catch { set({ storageError: "Analysis completed, but could not be saved in browser storage." }); }
+          if (token !== serial) return;
+        }
+      }
       if (!force) {
         try {
           const cached = await new AnalysisRepository().get(fen, version, config); if (token !== serial) return;
-          if (cached) { set({ result: cached, status: "ready", cached: true }); void assessLastMove(cached, token); return; }
+          if (cached && (!workspace.imported || usableResult(cached))) { set({ result: cached, status: "ready", cached: true }); void assessLastMove(cached, token, before); return; }
         } catch { set({ storageError: "Saved analysis is unavailable. Live analysis still works." }); }
       }
       if (token !== serial) return;
-      const result = await client.analyze(fen, config); if (token !== serial) return;
+      const result = withTerminalScore(await client.analyze(fen, config)); if (token !== serial) return;
       set({ result, status: "ready" });
-      void assessLastMove(result, token);
+      void assessLastMove(result, token, before);
       // Only complete current-position results are persisted, never raw UCI output.
       try { await new AnalysisRepository().save(result); }
       catch { set({ storageError: "Analysis completed, but could not be saved in browser storage." }); }
@@ -98,8 +124,10 @@ export const useAnalysis = create<AnalysisState>((set, get) => ({
     if (useWorkspace.getState().computer) return;
     refreshThreats();
     serial++; const client = engineClient(); if (newGame) client.newGame(); else client.stop();
-    set({ result: null, fen: null, cached: false, error: null, status: "stopped", assessment: null });
-    if (get().enabled) void get().analyze();
+    set({ result: null, fen: null, cached: false, error: null, status: "stopped", assessment: null, ...(newGame ? { reviewAssessments: {} } : {}) });
+    const workspace = useWorkspace.getState();
+    const reviewMove = workspace.imported?.tree.playable && (workspace.boardTransition === "move" || workspace.selectedPath.length > 1);
+    if (!client.reserved && (get().enabled || reviewMove)) void get().analyze();
   },
 }));
 

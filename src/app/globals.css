@@ -800,3 +800,58 @@ option { background: #11222a; color: var(--text); }
 [data-focus="true"] .player-strip > div { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 [data-focus="true"] .player-strip > div > div { margin: 0; }
 [data-focus="true"] .board-navigation { padding: 4px; }
+
+/* Mirrored move counts share a scale, with White filling toward the labels. */
+.review-breakdown { container-type: inline-size; min-width: 0; padding: 24px; border: 1px solid #35404b; border-radius: 20px; background: #0a121b; }
+.review-breakdown .review-section-heading { gap: 6px 12px; margin-bottom: 24px; color: #f1f5f9; font-size: 16px; font-weight: 800; }
+.review-breakdown .review-section-heading > span { color: #94a3b8; font-size: 14px; }
+.review-breakdown .review-breakdown-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 0; border-radius: 0; background: transparent; font-size: 16px; }
+.review-breakdown .review-breakdown-table thead { background: transparent; color: #94a3b8; }
+.review-breakdown .review-breakdown-table th, .review-breakdown .review-breakdown-table td { padding: 8px 0; border: 0; }
+.review-breakdown .review-breakdown-table thead th { padding-bottom: 16px; font-size: 14px; font-weight: 500; text-align: center; text-transform: none; letter-spacing: 0; }
+.review-breakdown .review-breakdown-table th:first-child, .review-breakdown .review-breakdown-table th:last-child,
+.review-breakdown .review-breakdown-table td:first-child, .review-breakdown .review-breakdown-table td:last-child { width: 30%; }
+.review-breakdown .review-breakdown-table tbody tr { --grade-color: #94a3b8; color: var(--grade-color); }
+.review-breakdown .review-breakdown-table tbody td { color: var(--grade-color); font-family: inherit; font-size: inherit; font-weight: 700; font-variant-numeric: tabular-nums; }
+.review-breakdown .review-breakdown-table tbody th { padding-inline: 14px; font-size: inherit; font-weight: 700; }
+.review-breakdown .review-breakdown-table .review-breakdown-label { display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: auto; min-width: 0; text-align: left; white-space: nowrap; }
+.review-breakdown .review-breakdown-label img { width: 36px; height: 36px; flex-shrink: 0; }
+.review-breakdown-side { display: flex; align-items: center; gap: 14px; }
+.review-breakdown-count { min-width: 2ch; text-align: left; }
+.review-breakdown-side[data-side="b"] .review-breakdown-count { text-align: right; }
+.review-breakdown-track { display: flex; flex: 1; height: 26px; min-width: 0; overflow: hidden; border-radius: 6px; background: #14212d; }
+.review-breakdown-track > span { height: 100%; border-radius: 4px; background: var(--grade-color); }
+.review-breakdown-side[data-side="w"] .review-breakdown-track { justify-content: flex-end; }
+.review-breakdown-side[data-side="w"] .review-breakdown-track > span { opacity: .55; }
+:root .review-breakdown .review-breakdown-table [data-grade="Brilliant"] { --grade-color: #21b6a5; }
+:root .review-breakdown .review-breakdown-table [data-grade="Great"] { --grade-color: #6f98bc; }
+:root .review-breakdown .review-breakdown-table [data-grade="Best"] { --grade-color: #6fa24a; }
+:root .review-breakdown .review-breakdown-table [data-grade="Excellent"] { --grade-color: #72a449; }
+:root .review-breakdown .review-breakdown-table [data-grade="Good"] { --grade-color: #88b26e; }
+:root .review-breakdown .review-breakdown-table [data-grade="Book"] { --grade-color: #c9986f; }
+:root .review-breakdown .review-breakdown-table [data-grade="Forced"] { --grade-color: #90a882; }
+:root .review-breakdown .review-breakdown-table [data-grade="Inaccuracy"] { --grade-color: #ddba35; }
+:root .review-breakdown .review-breakdown-table [data-grade="Mistake"] { --grade-color: #ed9950; }
+:root .review-breakdown .review-breakdown-table [data-grade="Blunder"] { --grade-color: #ed5146; }
+:root .review-breakdown .review-breakdown-table [data-grade="Miss"] { --grade-color: #ed7770; }
+:root .review-breakdown .review-breakdown-table [data-grade="Missed Win"] { --grade-color: #c8a514; }
+:root[data-theme="light"] .review-breakdown { background: #f8fafc; border-color: #cbd5e1; }
+:root[data-theme="light"] .review-breakdown-track { background: #e2e8f0; }
+:root[data-theme="light"] .review-breakdown .review-breakdown-table tbody tr { color: var(--grade-color); }
+:root[data-theme="light"] .review-breakdown .review-breakdown-table tbody td { color: inherit !important; }
+@container (max-width: 440px) {
+  .review-breakdown .review-section-heading { font-size: 13px; margin-bottom: 14px; }
+  .review-breakdown .review-section-heading > span { font-size: 12px; }
+  .review-breakdown .review-breakdown-table { font-size: 13px; }
+  .review-breakdown .review-breakdown-table thead th { font-size: 11px; }
+  .review-breakdown .review-breakdown-table tbody th { padding-inline: 8px; }
+  .review-breakdown .review-breakdown-table th:first-child, .review-breakdown .review-breakdown-table th:last-child,
+  .review-breakdown .review-breakdown-table td:first-child, .review-breakdown .review-breakdown-table td:last-child { width: 27%; }
+  .review-breakdown .review-breakdown-table .review-breakdown-label { gap: 7px; }
+  .review-breakdown .review-breakdown-label img { width: 26px; height: 26px; }
+  .review-breakdown-side { gap: 7px; }
+  .review-breakdown-track { height: 20px; }
+}
+@media (max-width: 639px) {
+  .review-breakdown { padding: 16px 12px; border-radius: 16px; }
+}

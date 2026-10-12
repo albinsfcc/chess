@@ -7,7 +7,7 @@ import { evaluationChange } from "./evaluation";
 import { bookContinuation, type OpeningIndex } from "../openings";
 
 // Original, deliberately conservative heuristics; not a platform's proprietary grading.
-export const MOVE_QUALITY = { minimumDepth: 12, decisiveAdvantage: 200, excellent: 0.02, good: 0.05, inaccuracy: 0.10, mistake: 0.20, greatGap: 150, sacrifice: 2, sacrificePlies: 6, healthy: -50, winning: 600, greatPointsGap: 0.15, brilliantMaxCpLoss: 30 } as const;
+export const MOVE_QUALITY = { minimumDepth: 12, decisiveAdvantage: 200, excellent: 0.02, good: 0.05, inaccuracy: 0.10, mistake: 0.20, greatGap: 150, sacrifice: 2, sacrificeRemaining: 1, healthy: -50, winning: 600, greatPointsGap: 0.15, brilliantMaxCpLoss: 30 } as const;
 export type MoveLabel = "Brilliant" | "Great" | "Best" | "Excellent" | "Good" | "Inaccuracy" | "Mistake" | "Blunder" | "Book" | "Forced" | "Miss" | "Missed Win";
 export type MoveAssessment = { label: MoveLabel; reason: string; provisional?: boolean };
 export type GradingContext = { book?: string; previous?: EngineResult };
@@ -32,28 +32,30 @@ function material(chess: Chess, color: "w" | "b") {
 export function pointsLossLabel(loss: number): MoveLabel {
   return loss <= MOVE_QUALITY.excellent ? "Excellent" : loss <= MOVE_QUALITY.good ? "Good" : loss <= MOVE_QUALITY.inaccuracy ? "Inaccuracy" : loss <= MOVE_QUALITY.mistake ? "Mistake" : "Blunder";
 }
-/** Conservative evidence: the played piece itself is newly offered now, not
- * an unrelated piece lost later or a temporary deficit in an ordinary exchange. */
-function sacrificeInLine(fen: string, played: string, continuation: string[]): boolean {
+/** A sound offer can be declined in the best line. Check legal acceptance on
+ * the moved piece's square, including material already captured and the best
+ * immediate recapture. Ordinary equal/favourable exchanges are not sacrifices.
+ * An exchange sacrifice can retain one pawn of compensation (R for B + P). */
+function sacrificeOffer(fen: string, played: string): boolean {
   const chess = new Chess(fen), mover = chess.turn(), initial = material(chess, mover);
   try {
     const offered = chess.move({ from: played.slice(0, 2), to: played.slice(2, 4), promotion: played[4] });
     if (offered.piece === "p" || offered.piece === "k" || offered.flags.includes("k") || offered.flags.includes("q")) return false;
-    // A later tactic cannot retroactively make a quiet move a sacrifice.
-    if (!chess.moves({ verbose: true }).some((move) => move.to === offered.to && move.captured === offered.piece)) return false;
-    for (const uci of continuation.slice(0, MOVE_QUALITY.sacrificePlies)) {
-      const move = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
-      // Moving it again creates a different offer, attributable to that later move.
-      if (move.color === mover && move.from === offered.to) return false;
-      if (move.color !== mover && move.to === offered.to && move.captured === offered.piece) {
-        let remainingLoss = initial - material(chess, mover);
-        for (const recapture of chess.moves({ verbose: true }).filter((reply) => reply.to === move.to && reply.captured)) {
-          chess.move(recapture); remainingLoss = Math.min(remainingLoss, initial - material(chess, mover)); chess.undo();
-        }
-        return remainingLoss >= MOVE_QUALITY.sacrifice;
+    // Require a piece or exchange investment, not a pawn-sized trade imbalance.
+    if (values[offered.piece] - (offered.captured ? values[offered.captured] : 0) < MOVE_QUALITY.sacrifice) return false;
+    const captures = chess.moves({ verbose: true }).filter(move => move.to === offered.to && move.captured === offered.piece);
+    for (const capture of captures) {
+      chess.move(capture);
+      let remainingLoss = initial - material(chess, mover);
+      for (const recapture of chess.moves({ verbose: true }).filter(reply => reply.to === offered.to && reply.captured)) {
+        chess.move(recapture);
+        remainingLoss = Math.min(remainingLoss, initial - material(chess, mover));
+        chess.undo();
       }
+      chess.undo();
+      if (remainingLoss >= MOVE_QUALITY.sacrificeRemaining) return true;
     }
-  } catch { /* Incomplete or illegal PV supplies no sacrifice evidence. */ }
+  } catch { /* Invalid moves supply no sacrifice evidence. */ }
   return false;
 }
 export function classifyMove(before: EngineResult, after: EngineResult, played: string, context: GradingContext = {}): MoveAssessment | null {
@@ -77,14 +79,12 @@ export function classifyMove(before: EngineResult, after: EngineResult, played: 
     // is not winning; never mistake the winning top move itself for a winning fallback.
     const alternative = before.lines.find((line) => line.multiPv === 2 && line.depth >= a.depth - 1 && !(sign === 1 ? line.lowerBound : line.upperBound));
     const alreadyWinning = alternative ? alternative.score.type === "cp" ? alternative.score.value * sign >= MOVE_QUALITY.winning : alternative.score.moves * sign > 0 : a.score.type === "cp" ? a.score.value * sign >= MOVE_QUALITY.winning : a.score.moves * sign > 0;
-    // A large expected-outcome separation is a critical move, even if a temporary
-    // material offer appears in its forcing line. This takes precedence over Brilliant.
-    if (best && !provisional && a.score.type === "cp" && alternative?.score.type === "cp" && a.score.value * sign >= MOVE_QUALITY.healthy && (a.score.value - alternative.score.value) * sign >= MOVE_QUALITY.greatGap && expectedPoints(a.score.value * sign) - expectedPoints(alternative.score.value * sign) >= MOVE_QUALITY.greatPointsGap) return graded("Great", "Critical engine-best move: at least a 150 cp gap and 15 percentage points of estimated outcome advantage over the next alternative, while retaining a healthy position.");
     const supportedNearBest = candidate && a.score.type === "cp" && candidate.score.type === "cp" && Math.max(0, (a.score.value - candidate.score.value) * sign) <= MOVE_QUALITY.brilliantMaxCpLoss && loss !== null && loss <= MOVE_QUALITY.excellent;
     if (!provisional && (best || supportedNearBest) && sound && !alreadyWinning) {
-      const continuation = candidate?.pvUci.slice(1) ?? [];
-      if (sacrificeInLine(before.fen, played, b.pvUci) || sacrificeInLine(before.fen, played, continuation)) return graded("Brilliant", "Best or same-position confirmed near-best move (within 30 cp): the moved piece is immediately legally capturable and is taken in the PV, with at least two points of material still conceded after an available immediate recapture. No clearly winning alternative was established. This is a heuristic, not proof.");
+      if (sacrificeOffer(before.fen, played)) return graded("Brilliant", "Sound best or same-position confirmed near-best piece sacrifice (within 30 cp). The moved piece can legally be taken for a material concession even after an immediate recapture; the opponent need not accept. No clearly winning alternative was established. This is a heuristic, not proof.");
     }
+    // A sound sacrifice takes precedence; critical non-sacrifices remain Great.
+    if (best && !provisional && a.score.type === "cp" && alternative?.score.type === "cp" && a.score.value * sign >= MOVE_QUALITY.healthy && (a.score.value - alternative.score.value) * sign >= MOVE_QUALITY.greatGap && expectedPoints(a.score.value * sign) - expectedPoints(alternative.score.value * sign) >= MOVE_QUALITY.greatPointsGap) return graded("Great", "Critical engine-best move: at least a 150 cp gap and 15 percentage points of estimated outcome advantage over the next alternative, while retaining a healthy position.");
     if (best) {
       return graded("Best", "Matches the engine's top move for the position before it was played. A separate search's evaluation drift does not downgrade this choice.");
     }

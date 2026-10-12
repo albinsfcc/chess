@@ -1,7 +1,7 @@
 import { MoveStrengthIcon } from "./move-strength-icon";
 import type { MoveLabel } from "@/lib/game-analysis/move-quality";
 const descriptions: Record<MoveLabel, string> = {
-  Brilliant: "A sound material sacrifice in the engine’s principal line.",
+  Brilliant: "A sound best or near-best piece sacrifice, even when the opponent declines it.",
   Great: "A critical best move with a large gap to the next alternative.",
   Best: "The engine’s top choice with minimal evaluation loss.",
   Excellent: "A very strong alternative with little evaluation loss.",

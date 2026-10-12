@@ -16,6 +16,7 @@ export function ReviewSummary({ compact = false }: { compact?: boolean } = {}) {
   const summary = useMemo(() => imported && selected?.status === "completed" ? reviewSummary(plan, positions, imported.game.id, index ?? undefined) : null, [plan, positions, imported, selected?.status, index]);
   if (!imported || !summary) return null;
   const plies = imported.tree.mainLine.length, graded = summary.w.graded + summary.b.graded;
+  const largestCount = Math.max(1, ...REVIEW_LABELS.flatMap(label => [summary.w.counts[label] ?? 0, summary.b.counts[label] ?? 0]));
   const depths = positions.map(row => row.depth).filter((depth): depth is number => depth !== null);
   return <div className="min-w-0 space-y-4" aria-label="Game review summary">
     {!compact && <section className="review-trend" aria-label="Evaluation trend"><div className="review-section-heading"><h3>Evaluation trend <span className="review-ply-count">({plies} plies · {Math.ceil(plies / 2)} moves)</span></h3><div className="review-legend"><span>White +</span><span>Black +</span></div></div><EvaluationGraph plan={plan} records={positions} selectedPath={path} select={select} /></section>}
@@ -35,8 +36,15 @@ export function ReviewSummary({ compact = false }: { compact?: boolean } = {}) {
       })}
       <span className="review-result">{imported.game.result}</span>
     </div></section>
-    <section className="review-breakdown">{!compact && <div className="review-section-heading"><h3>Move strength breakdown</h3><span>{graded} moves categorized</span></div>}
-    <table className="w-full table-fixed text-sm" aria-label="Move classifications by player"><thead><tr><th>White</th><th>Move classification</th><th>Black</th></tr></thead><tbody>{REVIEW_LABELS.map((label) => <tr key={label} data-grade={label}><td data-nonzero={!!summary.w.counts[label]}>{summary.w.counts[label] ?? 0}</td><th scope="row"><span className="inline-flex items-center gap-3"><MoveStrengthIcon label={label} />{label}</span></th><td data-nonzero={!!summary.b.counts[label]}>{summary.b.counts[label] ?? 0}</td></tr>)}</tbody></table></section>
+    <section className="review-breakdown"><div className="review-section-heading"><h3>Move strength breakdown</h3><span>{graded} moves categorized</span></div>
+    <table className="review-breakdown-table" aria-label="Move classifications by player"><thead><tr><th scope="col">White</th><th scope="col">Move classification</th><th scope="col">Black</th></tr></thead><tbody>{REVIEW_LABELS.map((label) => {
+      const white = summary.w.counts[label] ?? 0, black = summary.b.counts[label] ?? 0;
+      return <tr key={label} data-grade={label}>
+        <td><div className="review-breakdown-side" data-side="w"><span className="review-breakdown-count">{white}</span><span className="review-breakdown-track" aria-hidden="true"><span style={{ width: `${white / largestCount * 100}%` }} /></span></div></td>
+        <th scope="row"><span className="review-breakdown-label"><MoveStrengthIcon label={label} />{label}</span></th>
+        <td><div className="review-breakdown-side" data-side="b"><span className="review-breakdown-track" aria-hidden="true"><span style={{ width: `${black / largestCount * 100}%` }} /></span><span className="review-breakdown-count">{black}</span></div></td>
+      </tr>;
+    })}</tbody></table></section>
     {!compact && <section className="review-engine-meta"><div><p><span className="review-engine-dot" />{selected?.engineVersion} · {depths.length ? `Depth ${Math.min(...depths)}–${Math.max(...depths)}` : selected?.configuration.preset} · {selected?.configuration.multiPv} lines</p><p>{graded} / {summary.w.total + summary.b.total} moves graded</p></div>
     <details className="text-xs text-muted-foreground"><summary>How accuracy is calculated</summary><p className="mt-2">Local estimate v2: arithmetic mean of 100 ? exp(?5 ? loss) over non-forced moves. Loss is the larger of expected-points loss and 0.5 ? centipawn loss / (800 + absolute starting evaluation), capped at 1. This keeps significant material errors visible in already winning or losing positions. Exact engine-top moves score 100; same-position MultiPV is preferred over adjacent searches. Missing a forced win has a minimum loss of 0.10; maintaining mate is not penalized for search-depth changes. Mate distances are never converted to pawns. Missing results show ?. This is not Chess.com accuracy; engine depth can change the assessment.</p></details>
     <p className="review-phase-note">Phase estimates: opening = first 10 moves; endgame = at most 13 non-pawn material points; middlegame = other positions. Unplayed or incomplete phases show —.</p></section>}

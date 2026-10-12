@@ -93,6 +93,32 @@ it("regresses the supplied game using recorded local Stockfish 19 lines", () => 
 });
 
 import critical from '../../../tests/fixtures/critical-engine-output.json';
+import rookSacrifice from '../../../tests/fixtures/rfxf5-engine-output.json';
+it("recognizes 31...Rfxf5 as Brilliant even though the best defence declines the sacrifice", () => {
+  const normalized = rookSacrifice.map(row => ({ ...result(row.fen), bestMove: row.best.split(" ")[1], lines: row.lines.flatMap(raw => {
+    const parsed = parseUci(raw); return parsed?.type === "info" ? [normalizeInfo(row.fen, parsed)] : [];
+  }) }));
+  expect(normalized[1].bestMove).toBe("e2e6"); // 32.Re6, not 32.gxf5.
+  expect(classifyMove(normalized[0], normalized[1], "f8f5")?.label).toBe("Brilliant");
+  const accepted = new Chess(rookSacrifice[1].fen);
+  for (const move of ["gxf5", "Rg1+", "Rxg1", "Qxg1#"]) accepted.move(move);
+  expect(accepted.isCheckmate()).toBe(true);
+  const shallow = { ...normalized[1], lines: normalized[1].lines.map(line => ({ ...line, depth: 8 })) };
+  expect(classifyMove(normalized[0], shallow, "f8f5")?.label).not.toBe("Brilliant");
+  const losing = { ...normalized[1], lines: normalized[1].lines.map(line => ({ ...line, score: { type: "cp" as const, value: 300 } })) };
+  expect(classifyMove(normalized[0], losing, "f8f5")?.label).not.toBe("Brilliant");
+});
+it.each([
+  ["2b1k3/1n6/8/8/8/8/8/1R2K3 w - - 0 1", "b1b7", 1],
+  ["1r2k3/8/8/8/8/8/1N6/2B1K3 b - - 0 1", "b8b2", -1],
+] as const)("gives a critical sound exchange sacrifice priority over Great for %s", (fen, played, sign) => {
+  const chess = new Chess(fen), before = result(fen);
+  before.bestMove = played; before.lines[0].depth = 16;
+  before.lines.push({ ...before.lines[0], multiPv: 2, score: { type: "cp", value: -300 * sign } });
+  chess.move({ from: played.slice(0, 2), to: played.slice(2, 4) });
+  const after = result(chess.fen()); after.lines[0].depth = 16;
+  expect(classifyMove(before, after, played)?.label).toBe("Brilliant");
+});
 it("recognizes the supplied game's critical queen moves", () => {
   const normalized = critical.map((row) => ({ ...result(row.fen), bestMove: row.best.split(" ")[1], lines: row.lines.flatMap((raw) => { const parsed = parseUci(raw); return parsed?.type === "info" ? [normalizeInfo(row.fen, parsed)] : []; }) }));
   expect(classifyMove(normalized[0], normalized[1], "d1d5")?.label).toBe("Great");

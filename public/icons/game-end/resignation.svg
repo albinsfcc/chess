@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Resignation</title>
+  <circle cx="32" cy="32" r="30.5" fill="#ed5146" stroke="#28352e" stroke-width="1.5"/>
+  <path d="M18 52V13" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M20 15c10-8 18 8 29 0v22c-11 8-19-8-29 0z" fill="#fff"/>
+</svg>

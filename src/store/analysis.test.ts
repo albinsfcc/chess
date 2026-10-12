@@ -5,6 +5,8 @@ import { engineClient } from "@/lib/engine/client";
 import { AnalysisRepository } from "@/lib/engine/repository";
 import { defaultEnginePreferences, ENGINE_BUILD, type EngineEvent } from "@/lib/engine/domain";
 import { validatePgn } from "@/lib/pgn/import-service";
+import { Chess } from "chess.js";
+import { chessAt } from "@/lib/game";
 
 let disconnect: () => void;
 beforeEach(() => {
@@ -48,9 +50,9 @@ describe("analysis workspace coordination", () => {
     useWorkspace.getState().move("e2", "e4"); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(2));
     const document = (await validatePgn("1. e4 (1. d4 d5) e5 *")).validGames[0];
     useWorkspace.getState().openGame(document); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(3));
-    useWorkspace.getState().selectNode([0, 0, 1]); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(4));
+    useWorkspace.getState().selectNode([0, 0, 1]); await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(5));
     expect(useAnalysis.getState().fen).toContain("3p4/3P4");
-    useAnalysis.getState().stop(); useWorkspace.getState().selectNode([1]); expect(engineClient().analyze).toHaveBeenCalledTimes(4);
+    useAnalysis.getState().stop(); useWorkspace.getState().selectNode([1]); expect(engineClient().analyze).toHaveBeenCalledTimes(5);
   });
   it("blocks unsupported variants before initializing or submitting to the engine", async () => {
     const document = (await validatePgn('[Variant "Atomic"]\n1. e5 *')).unsupportedGames[0];
@@ -62,5 +64,44 @@ describe("analysis workspace coordination", () => {
     await useAnalysis.getState().analyze(); useAnalysis.getState().updatePreferences({ preset: "deep", multiPv: 5 });
     await vi.waitFor(() => expect(engineClient().analyze).toHaveBeenCalledTimes(2));
     expect(vi.mocked(engineClient().analyze).mock.calls[1][1]).toEqual({ preset: "deep", multiPv: 5 });
+  });
+  it("automatically grades successive review deviations with an uncached parent, even with assistance off", async () => {
+    vi.mocked(engineClient().analyze).mockImplementation(async (fen, config) => {
+      const move = new Chess(fen).moves({ verbose: true })[0];
+      const uci = `${move.from}${move.to}${move.promotion ?? ""}`;
+      return { requestId: "review", fen, config, engineBuild: ENGINE_BUILD, engineVersion: "Stockfish Test", bestMove: uci, bestMoveSan: move.san,
+        lines: [{ multiPv: 1, depth: 14, score: { type: "cp", value: 0 }, lowerBound: false, upperBound: false, pvUci: [uci], pvSan: [move.san], replayComplete: true }] };
+    });
+    const document = (await validatePgn("1. e4 e5 *")).validGames[0];
+    useWorkspace.getState().openGame(document);
+    useAnalysis.getState().start(false);
+    expect(useWorkspace.getState().move("a2", "a3").kind).toBe("moved");
+    await vi.waitFor(() => expect(useAnalysis.getState().assessment).not.toBeNull());
+    expect(engineClient().analyze).toHaveBeenCalledTimes(2);
+    const firstKey = `${document.game.id}:${useWorkspace.getState().selectedPath.join(".")}`;
+    expect(useAnalysis.getState().reviewAssessments[firstKey]).toEqual(useAnalysis.getState().assessment);
+    expect(useWorkspace.getState().move("a7", "a6").kind).toBe("moved");
+    await vi.waitFor(() => expect(useAnalysis.getState().assessment).not.toBeNull());
+    expect(engineClient().analyze).toHaveBeenCalledTimes(4);
+    expect(useAnalysis.getState().result?.fen).toBe(chessAt(useWorkspace.getState().game).fen());
+    expect(Object.keys(useAnalysis.getState().reviewAssessments)).toHaveLength(2);
+    expect(useAnalysis.getState().preferences.automatic).toBe(false);
+  });
+  it("does not publish a stale parent analysis after navigating away", async () => {
+    const document = (await validatePgn("1. e4 e5 *")).validGames[0];
+    useWorkspace.getState().openGame(document);
+    let finish: (() => void) | undefined;
+    vi.mocked(engineClient().analyze).mockImplementation((fen, config) => new Promise(resolve => {
+      finish = () => resolve({ requestId: "old", fen, config, engineBuild: ENGINE_BUILD, engineVersion: "Stockfish Test", lines: [], bestMove: null, bestMoveSan: null });
+    }));
+    useWorkspace.getState().move("a2", "a3");
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    useAnalysis.getState().stop();
+    useWorkspace.getState().selectNode([]);
+    finish!();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(useAnalysis.getState().assessment).toBeNull();
+    expect(useAnalysis.getState().result).toBeNull();
+    expect(engineClient().analyze).toHaveBeenCalledOnce();
   });
 });

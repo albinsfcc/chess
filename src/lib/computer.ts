@@ -33,6 +33,7 @@ export const BOTS: readonly BotProfile[] = [
 ];
 export type Side = "white" | "random" | "black";
 export const BOT_DELAY_MIN_MS = 1000, BOT_DELAY_MAX_MS = 10000;
+export const BOT_OPENING_DELAY_MS = 3000;
 export const FEEDBACK_HOLD_MS = 1000;
 export const OPENING_VARIETY_PLIES = 12, OPENING_MULTI_PV = 5;
 /** Opening variety stays within a small, strength-dependent evaluation budget. */
@@ -55,7 +56,7 @@ export function chooseOpeningMove(chess: Chess, result: EngineResult, bot: BotPr
   let sample = Math.max(0, Math.min(1, random())) * weights.reduce((a, b) => a + b, 0);
   return (candidates.find((_, i) => (sample -= weights[i]) < 0) ?? candidates[candidates.length - 1]).pvUci[0];
 }
-export function botDelayMs(random = Math.random) { return BOT_DELAY_MIN_MS + Math.floor(Math.max(0, Math.min(1, random())) * (BOT_DELAY_MAX_MS - BOT_DELAY_MIN_MS)); }
+export function botDelayMs(random = Math.random, opening = false) { return opening ? BOT_OPENING_DELAY_MS : BOT_DELAY_MIN_MS + Math.floor(Math.max(0, Math.min(1, random())) * (BOT_DELAY_MAX_MS - BOT_DELAY_MIN_MS)); }
 export function cancellableDelay(ms: number) {
   let cancel!: () => void;
   const promise = new Promise<void>(resolve => { const timer = setTimeout(resolve, ms); cancel = () => { clearTimeout(timer); resolve(); }; });

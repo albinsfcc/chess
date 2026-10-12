@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Winner</title>
+  <circle cx="32" cy="32" r="30.5" fill="#6fa24a" stroke="#28352e" stroke-width="1.5"/>
+  <path d="m12 20 11 9 9-16 9 16 11-9-5 25H17z" fill="#fff" stroke="#fff" stroke-linejoin="round" stroke-width="2"/><rect x="17" y="49" width="30" height="5" rx="1" fill="#fff"/>
+</svg>

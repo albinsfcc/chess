@@ -25,6 +25,8 @@ import { EvaluationBar } from "./evaluation-bar";
 import { useBoardAnimation } from "./use-board-animation";
 import { useMoveAssessment } from "./use-move-assessment";
 import { BoardMoveBadge } from "./board-move-badge";
+import { BoardGameEndBadges } from "./board-game-end-badges";
+import { gameEndBadges, recordedEnding } from "@/lib/board-game-end";
 import { moveHighlight } from "@/lib/board-assessment";
 import { playSound } from "@/lib/sound";
 
@@ -39,6 +41,8 @@ const promotions: { piece: PromotionPiece; name: string; white: string; black: s
 export function GameBoard() {
   const game = useWorkspace((state) => state.game);
   const exploring = useWorkspace((state) => state.imported !== null);
+  const imported = useWorkspace((state) => state.imported);
+  const selectedPath = useWorkspace((state) => state.selectedPath);
   const session = useComputer();
   const readOnly = useWorkspace((state) => state.imported?.tree.playable === false || !!state.computer && (state.computer.locked || chessAt(state.game).turn() !== state.computer.human));
   const orientation = useWorkspace((state) => state.orientation);
@@ -48,6 +52,9 @@ export function GameBoard() {
   const textureInset = texture.asset ? (boardTexture(preferences.boardTexture)?.borderInset ?? 0) * 100 : 0;
   const makeMove = useWorkspace((state) => state.move);
   const chess = useMemo(() => chessAt(game), [game]);
+  const ending = imported ? recordedEnding(imported, selectedPath)
+    : session.active && session.result ? { result: session.result, termination: session.termination } : undefined;
+  const endBadges = gameEndBadges(chess, ending, !imported || !!ending);
   const gameOver = chess.isCheckmate() || chess.isStalemate() || (!exploring && chess.isGameOver());
   const canPremove = session.active && !session.result && !session.error && !gameOver && chess.turn() !== session.human;
   const result = usePositionAnalysis(chess.fen());
@@ -250,7 +257,8 @@ export function GameBoard() {
             >{children}{circles.includes(square) && <span aria-hidden="true" className="pointer-events-none absolute inset-[8%] z-10 rounded-full border-[4px] border-purple-400" />}</div>;
           },
         }} />
-        {lastMove && assessment && animation.fen === chess.fen() && <BoardMoveBadge key={`${chess.fen()}:${assessment.label}`} square={lastMove.to} san={lastMove.san} orientation={orientation} assessment={assessment} />}
+        {lastMove && assessment && animation.fen === chess.fen() && !endBadges.some(badge => badge.square === lastMove.to) && <BoardMoveBadge key={`${chess.fen()}:${assessment.label}`} square={lastMove.to} san={lastMove.san} orientation={orientation} assessment={assessment} />}
+        {animation.fen === chess.fen() && !animation.settling && <BoardGameEndBadges badges={endBadges} orientation={orientation} />}
         </div>
       </div>
       <EvaluationBar fen={chess.fen()} />

@@ -1,0 +1,38 @@
+[
+  {
+    "which": "before",
+    "fen": "5rk1/7p/pp1p2q1/2pP1Br1/P1Pb2P1/8/1P1QR2P/1R5K b - - 0 31",
+    "move": "Rfxf5",
+    "uci": "f8f5",
+    "lines": [
+      "info depth 20 seldepth 46 multipv 1 score cp 573 nodes 2184325 nps 436865 hashfull 394 time 5000 pv f8f5 e2e6 f5f6 b1e1 g5g4 e6e8 f6f8 e8f8 g8f8 e1f1 f8g7 d2e1 g6e4 e1e4 g4e4 h1g2 e4e2 g2f3 e2h2 f1d1",
+      "info depth 20 seldepth 32 multipv 2 score cp -266 nodes 2184325 nps 436865 hashfull 394 time 5000 pv g6g7 h2h4 g5g6 f5g6 h7g6 e2e6 g7f7 d2g2 b6b5 c4b5 f7h7 g2h3 h7f7 g4g5 f7f2 e6g6 g8h7 g6e6",
+      "info depth 20 seldepth 46 multipv 3 score cp -303 nodes 2184325 nps 436777 hashfull 394 time 5001 pv g6h6 e2e7 h6f6 e7e6 g5f5 g4f5 f6f5 d2g2 g8h8 g2e4 f5h5 e4e2 h5f5 b1e1 d4e5 e6e5 d6e5 e2e4"
+    ],
+    "best": "bestmove f8f5 ponder e2e6"
+  },
+  {
+    "which": "after",
+    "fen": "6k1/7p/pp1p2q1/2pP1rr1/P1Pb2P1/8/1P1QR2P/1R5K w - - 0 32",
+    "move": "Rfxf5",
+    "uci": "f8f5",
+    "lines": [
+      "info depth 22 seldepth 29 multipv 1 score cp -546 nodes 2181902 nps 436293 hashfull 392 time 5001 pv e2e6 f5f6 b1e1 g5e5 h2h3 f6e6 d5e6 e5e6 b2b3 g6f6 h1h2 e6e5 h2g2 f6e7 e1e5 d6e5 d2h6 e5e4",
+      "info depth 22 seldepth 31 multipv 2 score cp -563 nodes 2181902 nps 436293 hashfull 392 time 5001 pv b1e1 g5g4 e2e8 g8g7 e8e7 f5f7 e7f7 g6f7 d2e2 g4f4 e2e7 f4f1 h1g2 f1g1 g2h3 g1e1 e7e1 d4e5 e1e2 h7h5 e2g2 g7h7",
+      "info depth 22 seldepth 23 multipv 3 score cp -592 nodes 2181902 nps 436293 hashfull 392 time 5001 pv h2h3 f5f3 h1h2 g5e5 b1e1 f3f8 e2e5 d6e5 h3h4 f8f2 d2f2 d4f2 e1e5 g6c2 e5e8 g8f7 e8e5"
+    ],
+    "best": "bestmove e2e6 ponder f5f6"
+  },
+  {
+    "which": "accepted",
+    "fen": "6k1/7p/pp1p2q1/2pP1Pr1/P1Pb4/8/1P1QR2P/1R5K b - - 0 32",
+    "move": "Rfxf5",
+    "uci": "f8f5",
+    "lines": [
+      "info depth 26 seldepth 4 multipv 1 score mate 2 nodes 2195944 nps 439188 hashfull 324 time 5000 pv g5g1 b1g1 g6g1",
+      "info depth 26 seldepth 30 multipv 2 score cp -525 nodes 2195944 nps 439100 hashfull 324 time 5001 pv g6f5 d2g5 f5g5 e2g2 g5g2 h1g2 g8f7 b1e1 a6a5 e1e6 d4e5 e6h6 f7g7 h6h3 g7g6 h3b3 g6f5 b3b6 f5e4 b6a6 e4d3 a6a5 e5b2 a5b5 b2c3 b5b6 d3c4 b6d6",
+      "info depth 26 seldepth 38 multipv 3 score cp -575 nodes 2195944 nps 439100 hashfull 324 time 5001 pv g6h5 d2g5 h5g5 e2g2 h7h6 g2g5 h6g5 h1g2 g8f7 b1e1 d4e5 e1e3 a6a5 e3b3 f7f6 h2h3 f6f5 g2f3 e5h2 b3b6"
+    ],
+    "best": "bestmove g5g1 ponder b1g1"
+  }
+]
