@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { moveSound, playSound, setSoundEnabled, disposeSound } from "./sound";
+import { boardChangeSound, moveSound, playSound, setSoundEnabled, disposeSound } from "./sound";
+import { createGame, type GameState } from "./game";
 
 describe("move sound precedence", () => {
+  it("sounds backward navigation, jumps and same-ply branch selection without sounding no-ops", () => {
+    const game: GameState = { ...createGame(), moves: [{ from: "e2", to: "e4", san: "e4" }, { from: "d7", to: "d5", san: "d5" }, { from: "e4", to: "d5", san: "exd5" }], cursor: 3 };
+    const end = { game, selectedPath: [2], boardTransition: "navigate" as const };
+    const start = { game: { ...game, cursor: 0 }, selectedPath: [], boardTransition: "navigate" as const };
+    expect(boardChangeSound(start, end)).toBe("move");
+    expect(boardChangeSound(end, start)).toBe("capture");
+    expect(boardChangeSound({ ...end, game: { ...game }, selectedPath: [1000000, 0, 0] }, end)).toBe("capture");
+    expect(boardChangeSound({ ...end, game: { ...game } }, end)).toBeNull();
+    expect(boardChangeSound({ ...start, boardTransition: "replace" }, end)).toBeNull();
+    expect(boardChangeSound(end, end)).toBeNull();
+  });
   it.each([
     ["e4", "move"], ["exd6", "capture"], ["gxh8=Q", "promotion"], ["e8=N", "promotion"], ["e8=Q+", "check"],
     ["O-O", "castle"], ["O-O-O", "castle"], ["Bxf7+", "check"],

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { disposeSound, moveSound, playSound, unlockSound } from "@/lib/sound";
+import { boardChangeSound, disposeSound, playSound, unlockSound } from "@/lib/sound";
 import { useSound } from "@/store/sound";
 import { useWorkspace } from "@/store/workspace";
 import { useGameAnalysis } from "@/store/game-analysis";
@@ -19,9 +19,8 @@ export function SoundEffects() {
     document.addEventListener("keydown", unlockSound, true);
     document.addEventListener("click", click, true);
     const offMoves = useWorkspace.subscribe((next, previous) => {
-      if (next.game === previous.game || next.boardTransition === "replace") return;
-      const move = next.game.moves[next.game.cursor - 1];
-      if (move && (next.boardTransition === "move" || next.game.cursor === previous.game.cursor + 1)) playSound(moveSound(move.san));
+      const effect = boardChangeSound(next, previous);
+      if (effect) playSound(effect);
     });
     const offAnalysis = useGameAnalysis.subscribe((next, previous) => {
       if (next.active?.status === "completed" && previous.active?.id === next.active.id && previous.active.status !== "completed") playSound("complete");

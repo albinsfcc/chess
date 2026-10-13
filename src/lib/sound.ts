@@ -1,3 +1,4 @@
+import type { GameState } from "./game";
 export type SoundEffect = "move" | "capture" | "check" | "checkmate" | "castle" | "promotion" | "invalid" | "click" | "complete";
 export const BOARD_SOUNDS: Partial<Record<SoundEffect, string>> = {
   move: "/sounds/move-self.mp3", capture: "/sounds/capture.mp3", castle: "/sounds/castle.mp3",
@@ -13,6 +14,18 @@ export function moveSound(san: string): SoundEffect {
   if (san.startsWith("O-O")) return "castle";
   if (san.includes("x")) return "capture";
   return "move";
+}
+type BoardSoundState = { game: GameState; selectedPath: number[]; boardTransition: "replace" | "navigate" | "move" };
+/** Review navigation should sound in both directions, including branch changes.
+ * Undo uses a neutral move cue rather than announcing a check/capture being left. */
+export function boardChangeSound(next: BoardSoundState, previous: BoardSoundState): SoundEffect | null {
+  if (next.game === previous.game || next.boardTransition === "replace") return null;
+  if (next.boardTransition === "navigate") {
+    if (next.game.cursor === previous.game.cursor && next.selectedPath.join(".") === previous.selectedPath.join(".")) return null;
+    if (next.game.cursor < previous.game.cursor) return "move";
+  }
+  const move = next.game.moves[next.game.cursor - 1];
+  return move ? moveSound(move.san) : null;
 }
 // Only UI notifications use synthesis. Board events use the user-specified local recordings.
 const notes: Record<SoundEffect, number[]> = {

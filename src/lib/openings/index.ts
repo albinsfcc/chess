@@ -1,10 +1,15 @@
 import { Chess } from "chess.js";
 import { z } from "zod";
-import type { GameState } from "../game";
+import { positionFen, type GameState } from "../game";
 const entrySchema = z.object({ eco: z.string().regex(/^[A-E]\d{2}$/), name: z.string().max(300), pgn: z.string().max(3000), ply: z.number().int().min(1).max(100) });
 export const openingIndexSchema = z.object({ version: z.literal(1), repository: z.string(), commit: z.string().regex(/^[a-f0-9]{40}$/), license: z.literal("CC0-1.0"), maxPly: z.number().int().max(100), entries: z.array(entrySchema).max(10000), named: z.record(z.string(), z.array(z.number().int().nonnegative())), edges: z.record(z.string(), z.record(z.string(), z.number().int().nonnegative())) });
 export type OpeningIndex = z.infer<typeof openingIndexSchema>;
 export type OpeningEntry = z.infer<typeof entrySchema>;
+export function relatedOpenings(entry: OpeningEntry, index: OpeningIndex): OpeningEntry[] {
+  const family = entry.name.split(":")[0].trim();
+  return index.entries.filter(candidate => candidate.name.split(":")[0].trim() === family && candidate.pgn !== entry.pgn)
+    .sort((a, b) => Number(b.eco === entry.eco) - Number(a.eco === entry.eco) || a.ply - b.ply || a.name.localeCompare(b.name));
+}
 let installed: OpeningIndex | null = null;
 export function installOpeningIndex(index: OpeningIndex) { installed = index; }
 export const openingKey = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
@@ -16,11 +21,9 @@ export function namedOpenings(fen: string, index: OpeningIndex): OpeningEntry[] 
   return (index.named[openingKey(fen)] ?? []).map((id) => index.entries[id]).filter(Boolean).sort((a, b) => a.ply - b.ply || a.name.localeCompare(b.name));
 }
 export function openingHistory(game: GameState, index: OpeningIndex) {
-  const chess = new Chess(game.initialFen);
-  let matches = namedOpenings(chess.fen(), index), matchedPly = 0;
+  let matches = namedOpenings(game.initialFen, index), matchedPly = 0;
   for (let ply = 0; ply < Math.min(game.cursor, game.moves.length, index.maxPly); ply++) {
-    chess.move(game.moves[ply]);
-    const found = namedOpenings(chess.fen(), index);
+    const found = namedOpenings(positionFen({ ...game, cursor: ply + 1 }), index);
     if (found.length) { matches = found; matchedPly = ply + 1; }
   }
   const match = matches[0];

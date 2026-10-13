@@ -5,6 +5,15 @@ import { visibleLines } from "./alternatives";
 export const TOP_MOVE_COLORS = ["#087cf0", "#3599f3", "#67b5f7", "#95cefa", "#c1e4fc"] as const;
 export const THREAT_COLOR = "#ef4444";
 export type BoardArrow = { startSquare: string; endSquare: string; color: string };
+/** The board keys arrows by endpoints, regardless of their source or color. */
+export function uniqueArrows(arrows: BoardArrow[], userArrows: BoardArrow[] = []): BoardArrow[] {
+  const key = (arrow: BoardArrow) => `${arrow.startSquare}-${arrow.endSquare}`;
+  const seen = new Set(userArrows.map(key));
+  return arrows.filter(arrow => {
+    if (seen.has(key(arrow))) return false;
+    seen.add(key(arrow)); return true;
+  });
+}
 export function topMoveArrows(fen: string, result: EngineResult | null, count: number): BoardArrow[] {
   if (!result || result.fen !== fen) return [];
   const arrows: BoardArrow[] = [], seen = new Set<string>();

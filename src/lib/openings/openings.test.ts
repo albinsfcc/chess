@@ -2,13 +2,23 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { Chess, DEFAULT_POSITION } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { openingIndexSchema, openingHistory, openingKey, bookContinuation } from "./index";
+import { openingIndexSchema, openingHistory, openingKey, bookContinuation, relatedOpenings } from "./index";
 const index = openingIndexSchema.parse(JSON.parse(readFileSync("public/openings/index.json", "utf8")));
 function game(pgn: string) {
   const chess = new Chess(); chess.loadPgn(pgn);
   return { initialFen: DEFAULT_POSITION, moves: chess.history({ verbose: true }).map(({from,to,san,promotion}) => ({from,to,san,...(promotion && promotion !== "p" && promotion !== "k" ? {promotion} : {})})), cursor: chess.history().length };
 }
 describe("pinned local opening knowledge", () => {
+  it("finds other lines in the same opening family and each opens at a legal position", () => {
+    const entry = index.entries.find(entry => entry.name.includes("Sicilian Defense: Najdorf"))!;
+    const related = relatedOpenings(entry, index);
+    expect(related.length).toBeGreaterThan(8);
+    expect(related.every(candidate => candidate.name.split(":")[0] === "Sicilian Defense" && candidate.pgn !== entry.pgn)).toBe(true);
+    for (const candidate of related) {
+      const board = new Chess(); board.loadPgn(candidate.pgn);
+      expect(board.history()).toHaveLength(candidate.ply);
+    }
+  });
   it("covers all 500 ECO codes and has reproducible provenance", () => {
     expect(index.entries.length).toBe(3815); expect(new Set(index.entries.map((entry) => entry.eco)).size).toBe(500);
     expect(index.license).toBe("CC0-1.0");

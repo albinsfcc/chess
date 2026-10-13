@@ -12,6 +12,24 @@ export type GameState = {
   moves: GameMove[];
   cursor: number;
 };
+
+// Navigation retains the immutable move array. Replay each prefix once, without
+// exposing a shared mutable Chess instance to board/input callers.
+const positionLines = new WeakMap<GameMove[], { initialFen: string; chess: Chess; fens: string[] }>();
+export function positionFen(game: GameState): string {
+  let line = positionLines.get(game.moves);
+  if (!line || line.initialFen !== game.initialFen) {
+    const chess = new Chess(game.initialFen);
+    line = { initialFen: game.initialFen, chess, fens: [chess.fen()] };
+    positionLines.set(game.moves, line);
+  }
+  const cursor = Math.max(0, Math.min(game.cursor, game.moves.length));
+  while (line.fens.length <= cursor) {
+    line.chess.move(game.moves[line.fens.length - 1]);
+    line.fens.push(line.chess.fen());
+  }
+  return line.fens[cursor];
+}
 export type MoveResult =
   | { kind: "moved"; game: GameState }
   | { kind: "promotion"; from: Square; to: Square }

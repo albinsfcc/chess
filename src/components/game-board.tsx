@@ -7,15 +7,15 @@ import { squareAppearance } from "@/lib/board-appearance";
 import { changeDescription } from "@/lib/game-analysis/evaluation";
 import { useComputer } from "@/store/computer";
 import { attackedHumanPieces, canQueuePremove } from "@/lib/computer";
-import { topMoveArrows, THREAT_COLOR } from "@/lib/engine/arrows";
+import { topMoveArrows, uniqueArrows, THREAT_COLOR, type BoardArrow } from "@/lib/engine/arrows";
 import { useThreats } from "@/store/threats";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
-import type { Square } from "chess.js";
+import { Chess, type Square } from "chess.js";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { checkedKing, chessAt, type GameState, type PromotionPiece } from "@/lib/game";
+import { checkedKing, chessAt, positionFen, type GameState, type PromotionPiece } from "@/lib/game";
 import { coordinateColor } from "@/lib/preferences";
 import { useWorkspace } from "@/store/workspace";
 import { useAnalysis } from "@/store/analysis";
@@ -51,9 +51,10 @@ export function GameBoard() {
   const texture = useBoardTexture(preferences.boardTexture);
   const textureInset = texture.asset ? (boardTexture(preferences.boardTexture)?.borderInset ?? 0) * 100 : 0;
   const makeMove = useWorkspace((state) => state.move);
-  const chess = useMemo(() => chessAt(game), [game]);
   const ending = imported ? recordedEnding(imported, selectedPath)
     : session.active && session.result ? { result: session.result, termination: session.termination } : undefined;
+  const needsHistory = !exploring || !!ending;
+  const chess = useMemo(() => needsHistory ? chessAt(game) : new Chess(positionFen(game)), [game, needsHistory]);
   const endBadges = gameEndBadges(chess, ending, !imported || !!ending);
   const gameOver = chess.isCheckmate() || chess.isStalemate() || (!exploring && chess.isGameOver());
   const canPremove = session.active && !session.result && !session.error && !gameOver && chess.turn() !== session.human;
@@ -66,15 +67,16 @@ export function GameBoard() {
   const showArrow = session.active ? session.assisted : preferenceArrow;
   const count = useAnalysis((state) => state.preferences.multiPv), showThreats = useAnalysis((state) => state.preferences.showThreats);
   const threatResult = useThreats((state) => state.result);
-  const arrows = useMemo(() => [
+  const [userArrows, setUserArrows] = useState<BoardArrow[]>([]);
+  const arrows = useMemo(() => uniqueArrows([
     ...(showArrow ? topMoveArrows(chess.fen(), result, count) : []),
     ...(!session.active && showThreats && threatResult?.fen === chess.fen() ? threatResult.threats.map((threat) => ({ startSquare: threat.from, endSquare: threat.to, color: THREAT_COLOR })) : []),
-  ], [showArrow, chess, result, count, showThreats, threatResult, session.active]);
+  ], userArrows), [showArrow, chess, result, count, showThreats, threatResult, session.active, userArrows]);
   const bestMove = showArrow && result?.fen === chess.fen() ? result.bestMove : null;
   const [selection, setSelection] = useState<{ square: Square; game: GameState; epoch: number; mode: boolean } | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square; game: GameState; premove?: boolean } | null>(null);
   const [circles, setCircles] = useState<string[]>([]);
-  const [userArrowCount, setUserArrowCount] = useState(0);
+  const userArrowCount = userArrows.length;
   const rightStart = useRef<string | null>(null);
   const [notice, setNotice] = useState("");
   const [keyboardSquare, setKeyboardSquare] = useState("a1");
@@ -187,7 +189,7 @@ export function GameBoard() {
           squareStyles,
           allowDrawingArrows: true,
           arrowOptions: { ...defaultArrowOptions, color: "#c084fc", colors: { ...defaultArrowOptions.colors, default: "#c084fc" } },
-          onArrowsChange: ({ arrows }) => setUserArrowCount(arrows.length),
+          onArrowsChange: ({ arrows }) => setUserArrows(arrows),
           onSquareMouseDown: ({ square }, event) => {
             if (event.button === 0) setCircles([]);
             if (event.button === 2) { rightStart.current = square; session.cancelPremove(); setSelection(null); }

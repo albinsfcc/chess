@@ -12,16 +12,14 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { gameStatus } from "@/lib/game";
 import { panelOrder, workspacePosition } from "@/lib/workspace-position";
 import { useBoardFit } from "./use-board-fit";
-import { navigationPly } from "@/lib/navigation";
+import { useMoveNavigation } from "./use-move-navigation";
+import { ImportActions } from "./import-actions";
 import { PlayerPanel } from "./player-panel";
 import { useWorkspace } from "@/store/workspace";
-import { PgnImportDialog } from "@/components/pgn-import-dialog";
 import { GameLibrary } from "@/components/game-library";
-import { GameLibraryDialog } from "@/components/game-library-dialog";
 import { WorkspaceInspector, type InspectorSection } from "./workspace-inspector";
 import { GameAnalysisDialog } from "./game-analysis-dialog";
 import { ImportedGameViewer } from "@/components/imported-game-viewer";
-import { PlatformImportDialog } from "@/components/platform-import-dialog";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { GameAnalysisPanel } from "@/components/game-analysis-panel";
 import { connectAnalysis, useAnalysis } from "@/store/analysis";
@@ -55,18 +53,7 @@ export function Workspace() {
   const status = gameStatus(chess);
   useEffect(() => { hydratePreferences(); }, [hydratePreferences]);
   useEffect(() => connectAnalysis(), []);
-  useEffect(() => {
-    const navigate = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
-      const target = event.target;
-      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [role="combobox"], [role="slider"]'))) return;
-      const game = useWorkspace.getState().game;
-      const next = navigationPly(event.key, game.cursor, game.moves.length);
-      if (next !== undefined) { event.preventDefault(); goTo(next); }
-    };
-    window.addEventListener("keydown", navigate);
-    return () => window.removeEventListener("keydown", navigate);
-  }, [goTo]);
+  useMoveNavigation();
   useEffect(() => {
     const hidden = () => {
       if (document.visibilityState !== "hidden") return;
@@ -87,9 +74,9 @@ export function Workspace() {
             <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><h1 className="text-xs tracking-wide text-muted-foreground">Workspace</h1></div>
           </div>
           <div className="frost-toolbar flex flex-wrap items-center gap-2" aria-label="Import actions">
-            <Button className="focus-toggle" variant="outline" title={focused ? "Exit focus" : "Focus mode"} aria-label={focused ? "Exit focus" : "Focus mode"} aria-pressed={focused} onClick={toggleFocus}>{focused ? <Minimize2 /> : <Maximize2 />}<span className="focus-label">{focused ? "Exit focus" : "Focus mode"}</span></Button><ComputerGame />
-            {!computer && <><PlatformImportDialog platform="chesscom" /><PlatformImportDialog platform="lichess" /><PgnImportDialog /></>}
-            <GameLibraryDialog disabled={computer} onOpen={() => setSection("moves")} /><SettingsDialog />
+            <ComputerGame />
+            {!computer && <ImportActions />}
+            <SettingsDialog />
           </div>
         </div>
       </header>
@@ -105,23 +92,24 @@ export function Workspace() {
                 <span className="text-xs text-muted-foreground">Standard chess</span>
                 <p role="status" data-testid="game-status" className={`text-sm font-medium ${chess.isCheck() ? "text-rose-300" : "text-primary"}`}>{status}</p>
               </div>
-              {!computer && <div data-board-chrome data-testid="board-navigation" className="board-toolbar board-navigation mt-2 rounded-xl border p-2">
-                <div className="board-mode-control">{imported ? <Button variant="outline" onClick={closeGame}>Free play</Button> : <Button variant="outline" disabled={!game.moves.length} onClick={reset}><RotateCcw /> Reset</Button>}</div>
+              <div data-board-chrome data-testid="board-navigation" className="board-toolbar board-navigation mt-2 rounded-xl border p-2">
+                {!computer && <><div className="board-mode-control">{imported ? <Button variant="outline" onClick={closeGame}>Free play</Button> : <Button variant="outline" disabled={!game.moves.length} onClick={reset}><RotateCcw /> Reset</Button>}</div>
                 <div className="board-history-controls" aria-label="Position navigation">
                   <Button variant="ghost" size="icon" aria-label={imported ? "First position" : "Go to start"} disabled={game.cursor === 0} onClick={() => goTo(0)}><ChevronFirst /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Previous move" : "Undo move"} disabled={game.cursor === 0} onClick={() => goTo(game.cursor - 1)}><ArrowLeft /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Next move" : "Redo move"} disabled={game.cursor === game.moves.length} onClick={() => goTo(game.cursor + 1)}><ArrowRight /></Button>
                   <Button variant="ghost" size="icon" aria-label={imported ? "Last move" : "Go to latest move"} disabled={game.cursor === game.moves.length} onClick={() => goTo(game.moves.length)}><ChevronLast /></Button>
                 </div>
-                <Button className="board-flip-control" variant="outline" onClick={flip}><FlipVertical2 /> Flip</Button>
-              </div>}
+                </>}
+                <div className="board-view-controls"><Button className="board-flip-control" variant="outline" onClick={flip}><FlipVertical2 /> Flip</Button><Button className="focus-toggle" variant="outline" title={focused ? "Exit focus" : "Focus mode"} aria-label={focused ? "Exit focus" : "Focus mode"} aria-pressed={focused} onClick={toggleFocus}>{focused ? <Minimize2 /> : <Maximize2 />}<span className="focus-label">{focused ? "Exit focus" : "Focus mode"}</span></Button></div>
+              </div>
             </div>
           </section>
 
           <aside className="workspace-panels grid min-w-0 grid-cols-1 gap-4" aria-label="Game workspace panels" tabIndex={0}>
             <WorkspaceInspector value={focused ? "moves" : section} onChange={setSection} actions={<GameAnalysisDialog onReviewStart={() => setSection("moves")} />} panels={{ moves: <>
-            {!focused && (computer ? section === "moves" && <ComputerAssistance /> : <ReviewSummaryCard />)}
-            {imported ? <ImportedGameViewer /> : <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
+            {computer ? !focused && section === "moves" && <ComputerAssistance /> : <ReviewSummaryCard />}
+            {imported ? <ImportedGameViewer afterMoves={<ReviewSummaryCard part="details" />} /> : <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="moves-heading">
               <div className="flex items-center justify-between border-b px-5 py-4"><h2 id="moves-heading" className="font-semibold">Moves</h2><span className="font-mono text-xs text-muted-foreground">{game.cursor} / {game.moves.length} ply</span></div>
               {!game.moves.length ? (
                 <div className="flex min-h-[200px] flex-col items-center justify-center px-6 py-8 text-center">

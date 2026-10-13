@@ -50,6 +50,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   selectNode: (path) => {
     const document = get().imported;
     if (!document) return;
+    if (path.join(".") === get().selectedPath.join(".")) return;
     const existing = path.length ? get().navigationPaths.findIndex((node) => node.join(".") === path.join(".")) + 1 : 0;
     const sameLine = get().navigationPaths.at(-1)?.slice(0, -1).join(".") === path.slice(0, -1).join(".");
     if (path.length && existing > 0 && sameLine) { set({ boardTransition: "navigate", game: navigateTo(get().game, existing), selectedPath: [...path] }); return; }
@@ -83,7 +84,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   goTo: (ply) => {
     if (get().computer) return;
     const next = navigateTo(get().game, ply);
-    if (get().imported) set({ boardTransition: "navigate", game: next, selectedPath: next.cursor ? get().navigationPaths[next.cursor - 1] : [] });
+    if (next.cursor === get().game.cursor) return;
+    if (get().imported) get().selectNode(next.cursor ? get().navigationPaths[next.cursor - 1] : []);
     else set({ boardTransition: "navigate", game: next });
   },
   reset: () => { if (get().computer) return; set({ boardTransition: "replace", boardEpoch: get().boardEpoch + 1, game: createGame(), imported: null, freeGame: null, selectedPath: [], navigationPaths: [] }); },

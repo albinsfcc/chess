@@ -23,7 +23,8 @@ test("PGN validates automatically and a single import opens review", async ({ pa
   await page.getByRole("button", { name: "Game library", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Saved games", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Open Alice vs Bob", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Review game", exact: true })).toBeVisible();
+  // Closing during preparation may happen before a resumable session is saved.
+  await expect(page.getByRole("button", { name: /^(Review game|Resume review)$/ })).toBeVisible();
   await page.getByRole("button", { name: "Game library", exact: true }).click();
   await page.getByRole("dialog", { name: "Saved games", exact: true }).getByRole("button", { name: "Delete Alice vs Bob", exact: true }).click();
   await page.getByRole("button", { name: "Delete game", exact: true }).click();

@@ -6,12 +6,12 @@ export function flattenMoves(nodes: GameNode[]): { node: GameNode; depth: number
 }
 export type MoveRow = { depth: number; moveNumber: number; nodes: GameNode[] };
 /** Pair White and Black within each line, then place its recursive variations below. */
-export function pairedMoveRows(nodes: GameNode[]): MoveRow[] {
+export function pairedMoveRows(nodes: GameNode[], breakAfter: ReadonlySet<string> = new Set()): MoveRow[] {
   const rows: MoveRow[] = [];
   function visit(line: GameNode[], depth: number) {
     for (let i = 0; i < line.length; i++) {
       const first = line[i], pair = [first], next = line[i + 1];
-      if (first.turn === "w" && next?.turn === "b" && next.moveNumber === first.moveNumber) { pair.push(next); i++; }
+      if (first.turn === "w" && next?.turn === "b" && next.moveNumber === first.moveNumber && !breakAfter.has(first.id)) { pair.push(next); i++; }
       rows.push({depth, moveNumber: first.moveNumber, nodes: pair});
       for (const node of pair) for (const branch of node.variations) visit(branch, depth + 1);
     }

@@ -34,7 +34,10 @@ export function useBoardFit() {
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
     const resize = new ResizeObserver(schedule);
     const mutations = new MutationObserver(schedule);
-    resize.observe(element); mutations.observe(element, { childList: true, subtree: true });
+    resize.observe(element);
+    // Piece animation mutates the board subtree every move. Only structural
+    // changes to the chrome need fitting; ResizeObserver handles its sizing.
+    mutations.observe(element.querySelector(".workspace-chess") ?? element, { childList: true });
     media.addEventListener("change", schedule); schedule();
     return () => { cancelAnimationFrame(frame); resize.disconnect(); mutations.disconnect(); media.removeEventListener("change", schedule); };
   }, []);

@@ -1,6 +1,6 @@
 import { useThreats } from "./threats";
 import { create } from "zustand";
-import { chessAt } from "@/lib/game";
+import { positionFen } from "@/lib/game";
 import { engineClient } from "@/lib/engine/client";
 import { defaultEnginePreferences, enginePreferencesSchema, ENGINE_PREFERENCES_KEY, type EnginePreferences, type EngineResult, type EngineStatus } from "@/lib/engine/domain";
 import { AnalysisRepository } from "@/lib/engine/repository";
@@ -23,10 +23,10 @@ async function assessLastMove(result: EngineResult, token: number, preparedBefor
   const game = useWorkspace.getState().game;
   if (!game.cursor) return;
   try {
-    const previous = chessAt({ ...game, cursor: game.cursor - 1 });
-    const before = preparedBefore ?? await new AnalysisRepository().get(previous.fen(), result.engineVersion, result.config);
+    const previous = positionFen({ ...game, cursor: game.cursor - 1 });
+    const before = preparedBefore ?? await new AnalysisRepository().get(previous, result.engineVersion, result.config);
     const move = game.moves[game.cursor - 1];
-    const previousResult = game.cursor > 1 ? await new AnalysisRepository().get(chessAt({ ...game, cursor: game.cursor - 2 }).fen(), result.engineVersion, result.config).catch(() => null) : null;
+    const previousResult = game.cursor > 1 ? await new AnalysisRepository().get(positionFen({ ...game, cursor: game.cursor - 2 }), result.engineVersion, result.config).catch(() => null) : null;
     const uci = `${move.from}${move.to}${move.promotion ?? ""}`;
     if (token === serial && before) {
       const assessment = classifyMove(before, result, uci, { book: bookContinuation(before.fen, uci)?.name, previous: previousResult ?? undefined });
@@ -45,7 +45,7 @@ function refreshThreats() {
 function currentPosition() {
   const workspace = useWorkspace.getState();
   if (workspace.imported && (!workspace.imported.tree.playable || workspace.imported.game.analysisStatus === "unsupported")) throw new Error("This variant is unsupported. Stockfish analyzes standard chess only.");
-  return chessAt(workspace.game).fen();
+  return positionFen(workspace.game);
 }
 export const useAnalysis = create<AnalysisState>((set, get) => ({
   assessment: null,
@@ -84,7 +84,7 @@ export const useAnalysis = create<AnalysisState>((set, get) => ({
       const workspace = useWorkspace.getState();
       let before: EngineResult | null = null;
       if (workspace.imported && workspace.game.cursor) {
-        const parentFen = chessAt({ ...workspace.game, cursor: workspace.game.cursor - 1 }).fen();
+        const parentFen = positionFen({ ...workspace.game, cursor: workspace.game.cursor - 1 });
         try { before = await new AnalysisRepository().get(parentFen, version, config); }
         catch { set({ storageError: "Saved analysis is unavailable. Live analysis still works." }); }
         if (token !== serial) return;
@@ -144,7 +144,7 @@ export function connectAnalysis(): () => void {
   const offWorkspace = useWorkspace.subscribe((next, previous) => {
     if (next.game === previous.game && next.imported === previous.imported) return;
     const newGame = next.imported?.game.id !== previous.imported?.game.id || (!next.imported && next.game.moves.length === 0 && previous.game.moves.length > 0);
-    if (newGame || chessAt(next.game).fen() !== chessAt(previous.game).fen()) useAnalysis.getState().positionChanged(newGame);
+    if (newGame || positionFen(next.game) !== positionFen(previous.game)) useAnalysis.getState().positionChanged(newGame);
   });
   useAnalysis.getState().hydrate(); refreshThreats();
   return () => { void useThreats.getState().update(null); offEngine(); offWorkspace(); useAnalysis.getState().stop(); client.terminate(); };

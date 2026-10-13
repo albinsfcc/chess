@@ -37,7 +37,7 @@ test("navigation animates without remounting, including rapid changes and reduce
   await page.getByTestId("chessboard").evaluate((element) => element.setAttribute("data-mount-probe", "retained"));
   await page.evaluate(() => {
     const board = document.querySelector('[data-testid="chessboard"]')!;
-    const observer = new MutationObserver((records) => { for (const record of records) { const element = record.target; if (element instanceof HTMLElement && element.dataset.piece && element.style.transition.includes("250ms")) board.setAttribute("data-observed-animation", element.style.transform); } });
+    const observer = new MutationObserver((records) => { for (const record of records) { const element = record.target; if (element instanceof HTMLElement && element.dataset.piece && element.style.transition.includes("180ms")) board.setAttribute("data-observed-animation", element.style.transform); } });
     observer.observe(board, { attributes: true, attributeFilter: ["style"], subtree: true });
   });
   await page.getByRole("button", { name: "Next move", exact: true }).click();
