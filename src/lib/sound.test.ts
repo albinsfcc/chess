@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { boardChangeSound, moveSound, playSound, setSoundEnabled, disposeSound } from "./sound";
+import { assessmentSound, boardChangeSound, moveSound, playSound, setSoundEnabled, disposeSound } from "./sound";
 import { createGame, type GameState } from "./game";
 
 describe("move sound precedence", () => {
+  it("uses special cues only for blunder and brilliant classifications", () => {
+    expect(assessmentSound("Blunder")).toBe("blunder");
+    expect(assessmentSound("Brilliant")).toBe("brilliant");
+    expect(assessmentSound("Best")).toBeNull();
+    expect(assessmentSound("Mistake")).toBeNull();
+    expect(assessmentSound()).toBeNull();
+  });
   it("sounds backward navigation, jumps and same-ply branch selection without sounding no-ops", () => {
     const game: GameState = { ...createGame(), moves: [{ from: "e2", to: "e4", san: "e4" }, { from: "d7", to: "d5", san: "d5" }, { from: "e4", to: "d5", san: "exd5" }], cursor: 3 };
     const end = { game, selectedPath: [2], boardTransition: "navigate" as const };
@@ -35,6 +42,10 @@ describe("move sound precedence", () => {
       expect(clips.find(clip => clip.src === "/sounds/promote.mp3")?.play).toHaveBeenCalledOnce();
       playSound("checkmate");
       expect(clips.find(clip => clip.src === "/sounds/game-end.webm")?.play).toHaveBeenCalledOnce();
+      playSound("blunder");
+      expect(clips.find(clip => clip.src === "/sounds/blunder.mp3")?.play).toHaveBeenCalledOnce();
+      playSound("brilliant");
+      expect(clips.find(clip => clip.src === "/sounds/brilliant.mp3")?.play).toHaveBeenCalledOnce();
       setSoundEnabled(false); playSound("move");
       expect(clips.find(clip => clip.src === "/sounds/move-self.mp3")?.play).not.toHaveBeenCalled();
       expect(clips.every(clip => clip.pause.mock.calls.length > 0)).toBe(true);

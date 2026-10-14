@@ -1,8 +1,13 @@
 import type { GameState } from "./game";
-export type SoundEffect = "move" | "capture" | "check" | "checkmate" | "castle" | "promotion" | "invalid" | "click" | "complete";
+import type { MoveLabel } from "./game-analysis/move-quality";
+export type SoundEffect = "move" | "capture" | "check" | "checkmate" | "castle" | "promotion" | "invalid" | "click" | "complete" | "blunder" | "brilliant";
+export function assessmentSound(label?: MoveLabel): "blunder" | "brilliant" | null {
+  return label === "Blunder" ? "blunder" : label === "Brilliant" ? "brilliant" : null;
+}
 export const BOARD_SOUNDS: Partial<Record<SoundEffect, string>> = {
   move: "/sounds/move-self.mp3", capture: "/sounds/capture.mp3", castle: "/sounds/castle.mp3",
   check: "/sounds/move-check.mp3", promotion: "/sounds/promote.mp3", checkmate: "/sounds/game-end.webm",
+  blunder: "/sounds/blunder.mp3", brilliant: "/sounds/brilliant.mp3",
 };
 const clips = new Map<string, HTMLAudioElement>();
 function stopClips() { for (const clip of clips.values()) { clip.pause(); clip.currentTime = 0; } }
@@ -31,6 +36,7 @@ export function boardChangeSound(next: BoardSoundState, previous: BoardSoundStat
 const notes: Record<SoundEffect, number[]> = {
   move: [440], capture: [220, 150], check: [660, 880], checkmate: [523, 392, 262],
   castle: [330, 440], promotion: [], invalid: [155, 130], click: [900], complete: [523, 659, 784, 1047],
+  blunder: [], brilliant: [],
 };
 let context: AudioContext | undefined;
 let enabled = true;
