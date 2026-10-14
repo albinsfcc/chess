@@ -11,10 +11,10 @@ export const preferencesSchema = z.object({
 });
 export type BoardPreferences = z.infer<typeof preferencesSchema>;
 export const defaultPreferences: BoardPreferences = {
-  lightSquare: "#dee5e7",
-  darkSquare: "#657e8b",
+  lightSquare: "#e8c99b",
+  darkSquare: "#94603e",
   showCoordinates: true,
-  boardTexture: "plain",
+  boardTexture: "wooden",
   pieceSet: "classic",
 };
 

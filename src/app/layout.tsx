@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./ocean.css";
 import { THEME_BOOTSTRAP, BLUR_BOOTSTRAP } from "@/lib/theme";
 import { ThemeSync } from "@/components/theme-sync";
 import { PIECE_CODES, pieceAsset } from "@/lib/board-appearance";

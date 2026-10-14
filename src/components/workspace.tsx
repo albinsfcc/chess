@@ -74,9 +74,9 @@ export function Workspace() {
             <div><p className="text-lg font-semibold tracking-tight">Chess Review</p><h1 className="text-xs tracking-wide text-muted-foreground">Workspace</h1></div>
           </div>
           <div className="frost-toolbar flex flex-wrap items-center gap-2" aria-label="Import actions">
-            <ComputerGame />
             {!computer && <ImportActions />}
             <SettingsDialog />
+            <ComputerGame />
           </div>
         </div>
       </header>
