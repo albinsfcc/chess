@@ -26,6 +26,8 @@ import { connectAnalysis, useAnalysis } from "@/store/analysis";
 import { useGameAnalysis } from "@/store/game-analysis";
 import { ReviewSummaryCard } from "./review-summary";
 import { OpeningPanel } from "./opening-panel";
+import { PositionCoach } from "./position-coach";
+import { FloatingCoach } from "./floating-coach";
 
 const GameBoard = dynamic(() => import("@/components/game-board").then((module) => module.GameBoard), {
   ssr: false,
@@ -132,13 +134,14 @@ export function Workspace() {
               <div className="border-t px-5 py-3 text-xs text-muted-foreground">{game.cursor < game.moves.length ? "Playing a new move here replaces the moves ahead." : "Select a move to revisit its position."}</div>
             </section>}
 
-            </>, opening: <OpeningPanel />, engine: computer ? section === "engine" && <ComputerAssistance /> : <><AnalysisPanel /><GameAnalysisPanel /></>, library: computer ? <p>Finish or exit the computer game to open your library.</p> : <GameLibrary onOpen={() => setSection("moves")} /> }} />
+            </>, coach: computer ? <p>Finish or exit the computer game to review positions with the coach.</p> : section === "coach" && <PositionCoach />, opening: <OpeningPanel />, engine: computer ? section === "engine" && <ComputerAssistance /> : <><AnalysisPanel /><GameAnalysisPanel /></>, library: computer ? <p>Finish or exit the computer game to open your library.</p> : <GameLibrary onOpen={() => setSection("moves")} /> }} />
 
             {storageError && <p role="alert" className="text-sm text-destructive">{storageError}</p>}
             <footer className="flex items-center gap-2 border-t py-3 text-xs text-muted-foreground"><LockKeyhole size={13} /> Local and private. Games and preferences stay on this device.</footer>
           </aside>
         </div>
       </main>
+      <FloatingCoach hidden={focused || section === "coach"} onExplain={() => setSection("coach")} />
     </div>
   );
 }

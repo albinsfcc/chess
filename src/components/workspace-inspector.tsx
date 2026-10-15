@@ -3,10 +3,11 @@ import { CurrentOpening } from "./current-opening";
 import { useWorkspace } from "@/store/workspace";
 import type { ReactNode } from "react";
 import { Tabs } from "radix-ui";
-import { BookOpen, Cpu, Library, ListOrdered } from "lucide-react";
-export type InspectorSection = "moves" | "engine" | "opening" | "library";
+import { BookOpen, Cpu, Library, ListOrdered, MessageCircle } from "lucide-react";
+export type InspectorSection = "moves" | "coach" | "engine" | "opening" | "library";
 const sections = [
   { id: "moves", label: "Moves", icon: ListOrdered },
+  { id: "coach", label: "Coach", icon: MessageCircle },
   { id: "engine", label: "Engine", icon: Cpu },
   { id: "opening", label: "Opening", icon: BookOpen },
   { id: "library", label: "Library", icon: Library },
@@ -19,7 +20,7 @@ export function WorkspaceInspector({ value, onChange, panels, actions }: {
   return <Tabs.Root value={value} onValueChange={value => onChange(value as InspectorSection)} className="frost-inspector">
     <div className="inspector-chrome">
     <div className="inspector-heading"><div className="inspector-title"><h2 className="text-lg font-semibold tracking-tight">{imported ? "Game review" : "Explore the position"}</h2></div><CurrentOpening />{actions}</div>
-    <Tabs.List aria-label="Workspace sections" className="inspector-tabs">
+    <Tabs.List aria-label="Workspace sections" className="inspector-tabs" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
       {sections.map(({ id, label, icon: Icon }) => <Tabs.Trigger key={id} value={id} className="inspector-tab"><Icon size={15} aria-hidden="true" /><span>{label}</span></Tabs.Trigger>)}
     </Tabs.List>
     </div>

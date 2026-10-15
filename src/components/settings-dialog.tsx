@@ -15,6 +15,7 @@ import { defaultPreferences } from "@/lib/preferences";
 import { useWorkspace } from "@/store/workspace";
 import { ImportSettings } from "./import-settings";
 import { EngineSettings } from "@/components/engine-settings";
+import { CoachSettings } from "./coach-settings";
 const DataSettings = dynamic(() => import("@/components/data-settings").then((module) => module.DataSettings), { loading: () => <p role="status">Loading local data controls…</p> });
 
 export function SettingsDialog() {
@@ -151,6 +152,7 @@ export function SettingsDialog() {
         </section>
         <section className="settings-panel space-y-5" aria-label="Analysis and sound">
         <EngineSettings />
+        <CoachSettings />
         <section className="space-y-2 border-t pt-4" aria-label="Sound settings">
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="sound-effects" className="text-sm font-medium">Sound effects</label>

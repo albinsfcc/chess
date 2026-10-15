@@ -1,0 +1,47 @@
+.floating-coach { position: fixed; z-index: 35; right: max(20px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; width: min(350px, calc(100vw - 24px)); }
+.coach-bubble { pointer-events: auto; width: 100%; border: 1px solid color-mix(in srgb, var(--coach-accent) 35%, var(--border)); border-radius: 20px 20px 5px 20px; background: var(--card); color: var(--foreground); box-shadow: 0 16px 55px #0004; padding: 18px; max-height: min(430px, 65dvh); overflow: auto; }
+.coach-bubble-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.coach-eyebrow { color: var(--muted-foreground); font-size: 9px; letter-spacing: .17em; font-weight: 600; }
+.coach-bubble h2 { font-size: 17px; font-weight: 650; margin-top: 3px; }
+.coach-bubble h2 span { display: block; font-size: 11px; font-weight: 400; color: var(--muted-foreground); margin-top: 2px; }
+.coach-comment { font-size: 14px; line-height: 1.65; margin: 14px 0 12px; }
+.coach-comment-source { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted-foreground); }
+.coach-mood-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--coach-accent); }
+.coach-mood-dot.concerned { background: #dca16c; }
+.coach-bubble-actions { display: flex; align-items: center; justify-content: space-between; gap: 4px; border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
+.coach-bubble-actions > button { font-size: 11px; padding-inline: 4px; }
+.coach-icon-button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--muted-foreground); cursor: pointer; flex-shrink: 0; }
+.coach-icon-button:hover { background: var(--muted); color: var(--foreground); }
+.coach-icon-button:disabled { opacity: .4; cursor: default; }
+.coach-icon-button:focus-visible, .coach-avatar-launcher:focus-visible, .coach-avatar-option:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.coach-avatar-launcher { pointer-events: auto; width: 110px; cursor: pointer; position: relative; margin-top: -3px; border-radius: 50%; }
+.coach-portrait { width: 100%; height: auto; display: block; }
+.coach-avatar-launcher .coach-portrait { filter: drop-shadow(0 5px 9px #0003); }
+.coach-name-tag { display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); padding: 4px 12px; border-radius: 20px; margin: -10px 10px 0; position: relative; font-size: 11px; }
+.coach-name-tag span { color: var(--coach-accent); }
+.coach-voice-error { font-size: 11px; line-height: 1.5; margin-top: 8px; color: var(--muted-foreground); }
+.coach-avatar-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.coach-avatar-option { cursor: pointer; padding: 8px 5px 12px; border: 1px solid var(--border); border-radius: 12px; text-align: center; background: var(--background); }
+.coach-avatar-option[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--background)); box-shadow: 0 0 0 1px var(--primary); }
+.coach-avatar-option .coach-portrait { max-width: 90px; margin: auto; }
+.coach-avatar-option strong { display: block; font-size: 13px; }
+.coach-avatar-option span { display: block; font-size: 10px; color: var(--muted-foreground); line-height: 1.4; margin-top: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .coach-portrait[data-speaking="true"] .coach-mouth { transform-box: fill-box; transform-origin: center; animation: coach-talk .24s ease-in-out infinite alternate; }
+  @keyframes coach-talk { from { transform: scaleY(.65); } to { transform: scaleY(1.15); } }
+}
+@media (max-width: 640px) {
+  .floating-coach { right: 12px; bottom: max(10px, env(safe-area-inset-bottom)); width: min(400px, calc(100vw - 24px)); flex-direction: row; align-items: flex-end; justify-content: flex-end; gap: 6px; }
+  .coach-avatar-launcher { width: 60px; flex-shrink: 0; }
+  .coach-bubble { width: auto; flex: 1; min-width: 0; padding: 10px 12px; border-radius: 16px 16px 5px 16px; }
+  .coach-eyebrow, .coach-bubble h2 span, .coach-comment-source { display: none; }
+  .coach-bubble h2 { font-size: 14px; margin: 0; }
+  .coach-bubble-header { align-items: center; }
+  .coach-bubble-header .coach-icon-button { height: 24px; width: 24px; }
+  .coach-comment { font-size: 12px; line-height: 1.5; margin-block: 6px; max-height: 6em; overflow: auto; }
+  .coach-bubble-actions { margin-top: 6px; padding-top: 5px; }
+  .coach-bubble-actions > button { font-size: 10px; gap: 4px; }
+  .coach-bubble-actions .coach-icon-button { width: 27px; height: 28px; }
+  .coach-name-tag { margin-inline: 0; font-size: 9px; padding-inline: 5px; gap: 5px; }
+}
+@media print { .floating-coach { display: none; } }
